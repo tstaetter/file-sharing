@@ -183,4 +183,4 @@ Use Axum's `IntoResponse` to return `(StatusCode, String)` tuples or custom erro
 
 - Use `cargo nextest` as described in the Testing section above.
 - For HTTP endpoint tests, use `axum::test::Server` or the lower-level `axum::body::Body` + `axum::http::Request` helpers to exercise handlers without binding to a real port.
-- For S3-dependent tests, abstract the client behind a trait or use a test S3 backend to avoid hitting the real R2 bucket.
+- For S3-dependent tests, use `aws-smithy-mocks` crate to avoid hitting the real R2 bucket.
