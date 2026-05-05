@@ -62,15 +62,15 @@ Test files live next to the modules they exercise (e.g., `src/lib/crypto.test.ts
 
 1. User selects a file.
 2. An AES-256-GCM key is generated, along with a random UUID as the file ID.
-3. The backend initiates a multipart upload (`POST /create-upload`).
-4. The file is split into 5 MB chunks. Each chunk gets its own random 12-byte IV, is encrypted, and is uploaded directly to R2 via a presigned URL (`POST /sign-parts`).
-5. ETags from each PUT are sent to the backend to complete the upload (`POST /complete-upload`).
+3. The backend initiates a multipart upload (`POST /v1/create-upload`).
+4. The file is split into 5 MB chunks. Each chunk gets its own random 12-byte IV, is encrypted, and is uploaded directly to R2 via a presigned URL (`POST /v1/sign-parts`).
+5. ETags from each PUT are sent to the backend to complete the upload (`POST /v1/complete-upload`).
 6. A capability URL is built: `{base}/f/{fileId}#{url-safe-base64(key)}`.
 
 ### Download (`/f/[id]`)
 
 1. Recipient opens the capability URL. The key is extracted from the hash fragment.
-2. The encrypted blob is fetched from the backend (`GET /f/{id}`), which deletes the object from R2 immediately after serving.
+2. The encrypted blob is fetched from the backend (`GET /v1/f/{id}`), which deletes the object from R2 immediately after serving.
 3. The blob is split back into per-chunk `IV + ciphertext` segments and decrypted with the Web Crypto API.
 4. Plaintext chunks are assembled into a Blob and triggered as a browser download.
 

@@ -177,19 +177,19 @@ describe('encryptChunk', () => {
 1. User selects a file via the file picker on `+page.svelte`.
 2. On click of "Encrypt & upload", `uploadFile()` in `src/lib/upload.ts` is called:
    - Generates a 256-bit AES-GCM key and a random UUID as the `file_id`.
-   - Calls `POST /create-upload` on the backend to initiate a multipart upload.
+   - Calls `POST /v1/create-upload` on the backend to initiate a multipart upload.
    - Iterates over the file in 5 MB chunks (`chunkFile()` from `src/lib/chunk.ts`).
    - Each chunk is encrypted with `encryptChunk()` from `src/lib/crypto.ts`, which prepends a 12-byte random IV followed by the ciphertext (including the 16-byte GCM authentication tag).
-   - For each chunk, requests a presigned URL from `POST /sign-parts` and PUTs the encrypted payload directly to R2.
+   - For each chunk, requests a presigned URL from `POST /v1/sign-parts` and PUTs the encrypted payload directly to R2.
    - Collects the ETag from each PUT response.
-   - Calls `POST /complete-upload` with the list of part numbers and ETags.
+   - Calls `POST /v1/complete-upload` with the list of part numbers and ETags.
 3. Returns the raw AES key bytes and file ID.
 4. `createCapabilityUrl()` in `src/lib/wasm.ts` builds the shareable URL by encoding the key as URL-safe base64 (no padding) and appending it as the URL hash fragment.
 
 ### Download (`/f/[id]` route)
 
 1. Recipient opens the capability URL. The key is extracted from `location.hash.slice(1)`.
-2. `onMount` in `+page.svelte` fetches `GET /f/{id}` from the backend.
+2. `onMount` in `+page.svelte` fetches `GET /v1/f/{id}` from the backend.
 3. The backend returns the encrypted blob as base64-encoded JSON, along with the original `content_type`.
 4. The frontend:
    - Decodes the base64 key and imports it as a `CryptoKey`.
@@ -212,10 +212,10 @@ The frontend expects the backend to be available at `http://localhost:8000` (har
 
 | Method | Endpoint            | Used in                  | Purpose                             |
 |--------|---------------------|--------------------------|-------------------------------------|
-| POST   | `/create-upload`    | `upload.ts`             | Initiate multipart upload           |
-| POST   | `/sign-parts`       | `upload.ts`             | Get presigned URLs for parts        |
-| POST   | `/complete-upload`  | `upload.ts`             | Finalise multipart upload           |
-| GET    | `/f/:id`            | `f/[id]/+page.svelte`   | Fetch encrypted blob (burn-after-read) |
+| POST   | `/v1/create-upload`    | `upload.ts`             | Initiate multipart upload           |
+| POST   | `/v1/sign-parts`       | `upload.ts`             | Get presigned URLs for parts        |
+| POST   | `/v1/complete-upload`  | `upload.ts`             | Finalise multipart upload           |
+| GET    | `/v1/f/:id`            | `f/[id]/+page.svelte`   | Fetch encrypted blob (burn-after-read) |
 
 Refer to `backend/AGENTS.md` for the request/response schemas.
 

@@ -71,11 +71,11 @@ deno task dev
 
 | Method | Path               | Purpose                                                  |
 |--------|--------------------|----------------------------------------------------------|
-| POST   | `/create-upload`   | Initiate a multipart upload                              |
-| POST   | `/sign-parts`      | Generate presigned URLs for part numbers                 |
-| POST   | `/complete-upload` | Finalise multipart upload with ETags                     |
-| POST   | `/abort-upload`    | Cancel an in-progress multipart upload                   |
-| GET    | `/f/:id`           | Download encrypted blob and **delete from R2**           |
+| POST   | `/v1/create-upload`   | Initiate a multipart upload                              |
+| POST   | `/v1/sign-parts`      | Generate presigned URLs for part numbers                 |
+| POST   | `/v1/complete-upload` | Finalise multipart upload with ETags                     |
+| POST   | `/v1/abort-upload`    | Cancel an in-progress multipart upload                   |
+| GET    | `/v1/f/:id`           | Download encrypted blob and **delete from R2**           |
 
 For full request/response schemas and curl examples, see [backend/README.md](backend/README.md).
 

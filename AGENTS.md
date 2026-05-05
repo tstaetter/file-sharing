@@ -43,21 +43,21 @@ Browser                              Backend                         R2
   │                                    │                              │
   │  1. Generate AES-256 key + UUID    │                              │
   │                                    │                              │
-  │  2. POST /create-upload ──────────►│                              │
+  │  2. POST /v1/create-upload ──────────►│                              │
   │     { file_id, content_type }      │                              │
   │◄────────── upload_id, key ────────│                              │
   │                                    │                              │
   │  3. For each 5MB chunk:           │                              │
   │     - encrypt(IV + chunk)         │                              │
   │                                    │                              │
-  │  4. POST /sign-parts ─────────────►│                              │
+  │  4. POST /v1/sign-parts ─────────────►│                              │
   │     { key, upload_id, parts }      │                              │
   │◄──────── presigned URLs ──────────│                              │
   │                                    │                              │
   │  5. PUT encrypted chunk ─────────────────────────────────────────►│
   │◄────────────────────────────────────── ETag ──────────────────────│
   │                                    │                              │
-  │  6. POST /complete-upload ────────►│                              │
+  │  6. POST /v1/complete-upload ────────►│                              │
   │     { key, upload_id, parts[] }    │   complete multipart ───────►│
   │                                    │                              │
   │  7. Build capability URL:         │                              │
@@ -72,7 +72,7 @@ Browser                              Backend                         R2
   │  1. Open /f/{uuid}#{key}          │                              │
   │     Extract key from hash          │                              │
   │                                    │                              │
-  │  2. GET /f/{uuid} ────────────────►│                              │
+  │  2. GET /v1/f/{uuid} ────────────────►│                              │
   │                                    │   get_object ───────────────►│
   │                                    │◄─────── encrypted blob ──────│
   │                                    │   delete_object ────────────►│

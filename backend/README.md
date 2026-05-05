@@ -43,16 +43,16 @@ All endpoints accept and return JSON.
 
 | Method | Path               | Purpose                                                  |
 |--------|--------------------|----------------------------------------------------------|
-| POST   | `/create-upload`   | Initiate a multipart upload. Returns `upload_id` and key. |
-| POST   | `/sign-parts`      | Generate presigned URLs for part numbers (valid 1 hour).  |
-| POST   | `/complete-upload` | Finalise multipart upload with ETags.                     |
-| POST   | `/abort-upload`    | Cancel an in-progress multipart upload.                   |
-| GET    | `/f/:id`           | Download encrypted blob. **Deletes object from R2 after reading.** |
+| POST   | `/v1/create-upload`   | Initiate a multipart upload. Returns `upload_id` and key. |
+| POST   | `/v1/sign-parts`      | Generate presigned URLs for part numbers (valid 1 hour).  |
+| POST   | `/v1/complete-upload` | Finalise multipart upload with ETags.                     |
+| POST   | `/v1/abort-upload`    | Cancel an in-progress multipart upload.                   |
+| GET    | `/v1/f/:id`           | Download encrypted blob. **Deletes object from R2 after reading.** |
 
 ### Example: Create Upload
 
 ```bash
-curl -X POST http://localhost:8000/create-upload \
+curl -X POST http://localhost:8000/v1/create-upload \
   -H "Content-Type: application/json" \
   -d '{"file_id": "abc123", "content_type": "image/png"}'
 ```
@@ -60,7 +60,7 @@ curl -X POST http://localhost:8000/create-upload \
 ### Example: Sign Parts
 
 ```bash
-curl -X POST http://localhost:8000/sign-parts \
+curl -X POST http://localhost:8000/v1/sign-parts \
   -H "Content-Type: application/json" \
   -d '{"key": "uploads/abc123", "upload_id": "...", "part_numbers": [1, 2, 3]}'
 ```
@@ -68,7 +68,7 @@ curl -X POST http://localhost:8000/sign-parts \
 ### Example: Download
 
 ```bash
-curl http://localhost:8000/f/abc123
+curl http://localhost:8000/v1/f/abc123
 ```
 
 Returns a JSON object with base64-encoded `data`, a `nonce`, and the original `content_type`.
