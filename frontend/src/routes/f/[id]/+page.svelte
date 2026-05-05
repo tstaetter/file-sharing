@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { PUBLIC_API_PREFIX } from '$env/static/public';
 	import { page } from '$app/state';
 
 	const CHUNK_SIZE = 5_000_000;
@@ -54,7 +55,7 @@
 			}
 
 			const id = page.params.id;
-			const res = await fetch(`http://127.0.0.1:8000/f/${id}`);
+			const res = await fetch(`${PUBLIC_API_PREFIX}/f/${id}`);
 			if (!res.ok) {
 				error = `Failed to fetch file: ${res.status} ${res.statusText}`;
 				loading = false;

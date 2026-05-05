@@ -17,7 +17,7 @@ deno install
 
 ### Environment
 
-The upload and download pages hardcode the backend base URL as `http://localhost:8000`. Make sure the backend is running, or update the URLs in `src/lib/upload.ts` and `src/routes/f/[id]/+page.svelte` if the backend is deployed elsewhere.
+The backend base URL is configured via `PUBLIC_API_PREFIX` in `frontend/.env` (default: `http://localhost:8000/v1`). Make sure the backend is running, or update `.env` if the backend is deployed elsewhere.
 
 ### Run
 

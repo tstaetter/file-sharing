@@ -71,7 +71,7 @@ frontend/
    cd frontend
    deno install
    ```
-3. **Environment:** The upload page and download page hardcode the backend base URL as `http://localhost:8000`. Make sure the backend is running, or update the URLs in `src/lib/upload.ts` and `src/routes/f/[id]/+page.svelte` if the backend is deployed elsewhere.
+3. **Environment:** The backend base URL is configured via `PUBLIC_API_PREFIX` in `frontend/.env` (default: `http://localhost:8000/v1`). Make sure the backend is running, or update `.env` if the backend is deployed elsewhere.
 
 ## How to Run
 
@@ -208,7 +208,7 @@ describe('encryptChunk', () => {
 
 ## API Contract with Backend
 
-The frontend expects the backend to be available at `http://localhost:8000` (hardcoded in `upload.ts` and the download page). If the backend URL changes, update both locations.
+The frontend reads the backend base URL from `PUBLIC_API_PREFIX` in `$env/static/public` (set in `.env`). Both `upload.ts` and the download page use this variable, so changing the backend URL only requires updating the `.env` file.
 
 | Method | Endpoint            | Used in                  | Purpose                             |
 |--------|---------------------|--------------------------|-------------------------------------|
@@ -227,7 +227,7 @@ Refer to `backend/AGENTS.md` for the request/response schemas.
 - Use **Svelte 5 runes** (`$state`, `$derived`, `$props`, `$effect`) for all new code. The `svelte.config.js` forces runes mode project-wide.
 - **$lib alias:** Import shared modules via `$lib/` (e.g., `import { uploadFile } from '$lib/upload'`). Do not use relative paths to reach into `src/lib/`.
 - **File naming:** Use `kebab-case` for route directories and `.ts` / `.svelte` extensions for modules and components. Test files use `.test.ts`.
-- **Environment-specific URLs:** Currently backend URLs are hardcoded. A future improvement is to use SvelteKit environment variables (`$env/static/public`) for the backend base URL.
+- **Environment-specific URLs:** The backend base URL is configured via the `PUBLIC_API_PREFIX` environment variable in `frontend/.env`, accessible in browser-side code through `$env/static/public`.
 
 ## Common Tasks for Agents
 
@@ -257,9 +257,9 @@ Refer to `backend/AGENTS.md` for the request/response schemas.
 
 ### Updating the backend URL
 
-1. Find the hardcoded URL in `src/lib/upload.ts` (used in three `fetch` calls).
-2. Find the hardcoded URL in `src/routes/f/[id]/+page.svelte` (the download fetch).
-3. Consider moving the base URL to a SvelteKit environment variable in `$env/static/public` for easier configuration.
+1. Update the `PUBLIC_API_PREFIX` value in `frontend/.env`.
+2. Both `upload.ts` and `+page.svelte` import `PUBLIC_API_PREFIX` from `$env/static/public`, so no code changes are needed.
+3. For deployments, set `PUBLIC_API_PREFIX` in the production environment rather than in `.env`.
 
 ### Adding a UI dependency
 

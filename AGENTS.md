@@ -130,11 +130,11 @@ deno task dev
 | Frontend | `http://localhost:5173`    |
 | Backend  | `http://localhost:8000`    |
 
-The frontend hardcodes the backend URL in two places:
-- `frontend/src/lib/upload.ts` (three `fetch` calls)
+The frontend reads the backend base URL from the `PUBLIC_API_PREFIX` environment variable (`$env/static/public`), used in two places:
+- `frontend/src/lib/upload.ts` (three `fetch` calls for create-upload, sign-parts, complete-upload)
 - `frontend/src/routes/f/[id]/+page.svelte` (one `fetch` call)
 
-If you deploy to a different host, update both files or migrate to SvelteKit environment variables (`$env/static/public`).
+Set `PUBLIC_API_PREFIX` in `frontend/.env` (or your deployment environment) to point at the backend.
 
 ## Sub-Project AGENTS.md References
 
