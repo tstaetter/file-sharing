@@ -9,3 +9,5 @@ frontend/.idea
 frontend/.zed
 **/*/.DS_Store
 .DS_Store
+.env
+**/*/.env
