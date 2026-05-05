@@ -4,9 +4,12 @@ use aws_sdk_s3::Client;
 use aws_smithy_types_convert::date_time::DateTimeExt;
 use chrono::{Duration, Utc};
 use cleanup_orphaned_uploads::{CleanupError, CleanupResult};
+use futures::{stream::FuturesUnordered, StreamExt};
 use std::env;
 use tracing::info;
 use tracing_subscriber::{prelude::*, EnvFilter};
+
+const MAX_CONCURRENT: usize = 10;
 
 #[tokio::main]
 async fn main() -> CleanupResult<()> {
@@ -45,6 +48,7 @@ async fn main() -> CleanupResult<()> {
 
     info!("Cleaning uploads older than {}", cutoff);
 
+    let mut tasks = FuturesUnordered::new();
     let mut key_marker = None;
     let mut upload_id_marker = None;
 
@@ -60,23 +64,38 @@ async fn main() -> CleanupResult<()> {
             .map_err(|e| CleanupError::Sdk(e.to_string()))?;
 
         for upload in resp.uploads() {
-            let key = upload.key().unwrap_or_default();
-            let upload_id = upload.upload_id().unwrap_or_default();
+            let key = upload.key().unwrap_or_default().to_string();
+            let upload_id = upload.upload_id().unwrap_or_default().to_string();
 
             let initiated = upload.initiated().unwrap();
             let initiated_time = initiated.to_chrono_utc()?;
 
             if initiated_time < cutoff {
-                info!("Aborting upload: {} ({})", key, upload_id);
+                let client_clone = client.clone();
+                let bucket_clone = bucket.clone();
 
-                client
-                    .abort_multipart_upload()
-                    .bucket(&bucket)
-                    .key(key)
-                    .upload_id(upload_id)
-                    .send()
-                    .await
-                    .map_err(|e| CleanupError::Sdk(e.to_string()))?;
+                tasks.push(tokio::spawn(async move {
+                    info!("Aborting {} ({})", key, upload_id);
+
+                    client_clone
+                        .abort_multipart_upload()
+                        .bucket(bucket_clone)
+                        .key(&*key)
+                        .upload_id(&*upload_id)
+                        .send()
+                        .await
+                }));
+
+                // 🧠 Concurrency Limit
+                if tasks.len() >= MAX_CONCURRENT {
+                    if let Some(res) = tasks.next().await {
+                        match res {
+                            Ok(Ok(_)) => {}
+                            Ok(Err(e)) => return Err(CleanupError::Sdk(e.to_string())),
+                            Err(e) => return Err(CleanupError::Sdk(e.to_string())),
+                        }
+                    }
+                }
             }
         }
 
@@ -90,6 +109,15 @@ async fn main() -> CleanupResult<()> {
             }
         } else {
             break;
+        }
+    }
+
+    // remaining tasks abwarten
+    while let Some(res) = tasks.next().await {
+        match res {
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => return Err(CleanupError::Sdk(e.to_string())),
+            Err(e) => return Err(CleanupError::Sdk(e.to_string())),
         }
     }
 
