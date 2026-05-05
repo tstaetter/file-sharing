@@ -40,7 +40,7 @@ async fn test_download_happy_path() {
 
     // ── Act ──────────────────────────────────────────────────────────────
 
-    let response = test_server.get("/f/test-file-id").await;
+    let response = test_server.get("/v1/f/test-file-id").await;
 
     // ── Assert ───────────────────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ async fn test_download_not_found() {
 
     // ── Act ──────────────────────────────────────────────────────────────
 
-    let response = test_server.get("/f/nonexistent").await;
+    let response = test_server.get("/v1/f/nonexistent").await;
 
     // ── Assert ───────────────────────────────────────────────────────────
 

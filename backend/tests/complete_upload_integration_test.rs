@@ -25,7 +25,7 @@ async fn test_complete_upload() {
 
     // Act: POST to the complete-upload endpoint
     let response = test_server
-        .post("/complete-upload")
+        .post("/v1/complete-upload")
         .json(&json!({
             "key": "uploads/test-file-id",
             "upload_id": "test-upload-id",

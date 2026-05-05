@@ -31,7 +31,7 @@ async fn test_sign_parts_multiple() {
 
     // ── Act ──────────────────────────────────────────────────────────────
     let response = test_server
-        .post("/sign-parts")
+        .post("/v1/sign-parts")
         .json(&serde_json::json!({
             "key": "uploads/test-file-id",
             "upload_id": "test-upload-id",
@@ -102,7 +102,7 @@ async fn test_sign_parts_single() {
 
     // ── Act ──────────────────────────────────────────────────────────────
     let response = test_server
-        .post("/sign-parts")
+        .post("/v1/sign-parts")
         .json(&serde_json::json!({
             "key": "uploads/single-part",
             "upload_id": "upload-42",

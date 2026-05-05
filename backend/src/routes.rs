@@ -4,12 +4,14 @@ use axum::{Router, routing::post};
 use tower_http::cors::CorsLayer;
 
 pub fn app(state: AppState) -> Router {
-    Router::new()
+    let routes = Router::new()
         .route("/create-upload", post(create_upload))
         .route("/sign-parts", post(sign_parts))
         .route("/complete-upload", post(complete_upload))
         .route("/abort-upload", post(abort_upload))
         .route("/f/{id}", get(download))
         .layer(CorsLayer::permissive())
-        .with_state(state)
+        .with_state(state);
+
+    Router::new().nest("/v1", routes)
 }

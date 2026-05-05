@@ -26,7 +26,7 @@ async fn test_create_upload_without_content_type() {
 
     // Act: POST without content_type
     let response = test_server
-        .post("/create-upload")
+        .post("/v1/create-upload")
         .json(&json!({
             "file_id": "test-file-id"
         }))
@@ -66,7 +66,7 @@ async fn test_create_upload_with_content_type() {
 
     // Act: POST with content_type
     let response = test_server
-        .post("/create-upload")
+        .post("/v1/create-upload")
         .json(&json!({
             "file_id": "test-file-id",
             "content_type": "image/png"

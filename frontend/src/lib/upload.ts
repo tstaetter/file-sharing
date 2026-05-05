@@ -1,5 +1,6 @@
 import { generateKey, encryptChunk } from './crypto';
 import { chunkFile } from './chunk';
+import { API_PREFIX } from '$env/static/private';
 
 interface CreateUploadResponse {
 	upload_id: string;
@@ -24,7 +25,7 @@ export async function uploadFile(file: File): Promise<UploadResult> {
 	const { key, raw } = await generateKey();
 	const fileId = crypto.randomUUID();
 
-	const init = await fetch('http://localhost:8000/create-upload', {
+	const init = await fetch(`${API_PREFIX}/create-upload`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ file_id: fileId, content_type: file.type || null })
@@ -41,7 +42,7 @@ export async function uploadFile(file: File): Promise<UploadResult> {
 		payload.set(iv);
 		payload.set(data, iv.length);
 
-		const res = await fetch('http://localhost:8000/sign-parts', {
+		const res = await fetch(`${API_PREFIX}/sign-parts`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
@@ -67,7 +68,7 @@ export async function uploadFile(file: File): Promise<UploadResult> {
 		part++;
 	}
 
-	await fetch('http://localhost:8000/complete-upload', {
+	await fetch(`${API_PREFIX}/complete-upload`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({

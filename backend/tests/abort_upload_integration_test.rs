@@ -25,7 +25,7 @@ async fn test_abort_upload() {
 
     // Act: POST to the abort-upload endpoint
     let response = test_server
-        .post("/abort-upload")
+        .post("/v1/abort-upload")
         .json(&json!({
             "key": "uploads/test-file-id",
             "upload_id": "test-upload-id"
