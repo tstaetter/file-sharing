@@ -1,42 +1,121 @@
-# sv
+# Frontend
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Browser-based UI for the file-sharing service. Built with **SvelteKit** and **Svelte 5** (runes mode), it encrypts files client-side with AES-256-GCM and uploads them directly to Cloudflare R2 via presigned URLs. Recipients open a capability URL with the decryption key embedded in the hash fragment — the key never touches the server.
 
-## Creating a project
+## Quick Start
 
-If you're seeing this, you've probably already done this step. Congrats!
+### Prerequisites
 
-```sh
-# create a new project
-npx sv create my-app
+- [Deno](https://deno.com/) 2.x or later
+
+### Install
+
+```bash
+cd frontend
+deno install
 ```
 
-To recreate this project with the same configuration:
+### Environment
 
-```sh
-# recreate this project
-deno run npm:sv@0.15.2 create --template minimal --types ts --add prettier eslint mcp="ide:other+setup:local" --install deno .
+The upload and download pages hardcode the backend base URL as `http://localhost:8000`. Make sure the backend is running, or update the URLs in `src/lib/upload.ts` and `src/routes/f/[id]/+page.svelte` if the backend is deployed elsewhere.
+
+### Run
+
+```bash
+deno task dev
 ```
 
-## Developing
+Opens at **`http://localhost:5173`** with hot module replacement.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## All Tasks
 
-```sh
-npm run dev
+| Command              | Purpose                                  |
+|----------------------|------------------------------------------|
+| `deno task dev`      | Start development server                 |
+| `deno task build`    | Create production build (`build/`)       |
+| `deno task preview`  | Preview production build locally         |
+| `deno task check`    | Type-check with `svelte-check`           |
+| `deno task lint`     | Lint with Prettier + ESLint              |
+| `deno task format`   | Auto-format with Prettier                |
+| `deno task test`     | Run Vitest tests once                    |
+| `deno task test:watch` | Run tests in watch mode                |
+| `deno task test:ui`  | Run tests with Vitest UI                 |
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+## Testing
+
+```bash
+# Run all tests once
+deno task test
+
+# Watch mode (re-runs on file changes)
+deno task test:watch
+
+# Vitest UI
+deno task test:ui
 ```
 
-## Building
+Test files live next to the modules they exercise (e.g., `src/lib/crypto.test.ts`).
 
-To create a production version of your app:
+## How It Works
 
-```sh
-npm run build
+### Upload (`/`)
+
+1. User selects a file.
+2. An AES-256-GCM key is generated, along with a random UUID as the file ID.
+3. The backend initiates a multipart upload (`POST /create-upload`).
+4. The file is split into 5 MB chunks. Each chunk gets its own random 12-byte IV, is encrypted, and is uploaded directly to R2 via a presigned URL (`POST /sign-parts`).
+5. ETags from each PUT are sent to the backend to complete the upload (`POST /complete-upload`).
+6. A capability URL is built: `{base}/f/{fileId}#{url-safe-base64(key)}`.
+
+### Download (`/f/[id]`)
+
+1. Recipient opens the capability URL. The key is extracted from the hash fragment.
+2. The encrypted blob is fetched from the backend (`GET /f/{id}`), which deletes the object from R2 immediately after serving.
+3. The blob is split back into per-chunk `IV + ciphertext` segments and decrypted with the Web Crypto API.
+4. Plaintext chunks are assembled into a Blob and triggered as a browser download.
+
+### Encryption Model
+
+- **Algorithm:** AES-256-GCM.
+- **Per-chunk IVs:** Each 5 MB chunk gets a unique random 12-byte IV prepended to the ciphertext.
+- **Key distribution:** The symmetric key is embedded in the URL hash fragment, which is never transmitted over HTTP.
+- **Backend opacity:** The backend stores and serves raw encrypted bytes. It never sees the key or plaintext.
+
+## Project Structure
+
+```
+src/
+├── app.css                  ← Tailwind directives
+├── app.d.ts                 ← ambient type declarations
+├── app.html                 ← HTML shell
+├── lib/
+│   ├── index.ts             ← barrel export for $lib
+│   ├── chunk.ts             ← file chunking generator (5 MB chunks)
+│   ├── crypto.ts            ← AES-GCM key generation & per-chunk encryption
+│   ├── upload.ts            ← multipart upload orchestrator
+│   ├── wasm.ts              ← capability URL builder (URL-safe base64)
+│   └── assets/
+│       └── favicon.svg
+└── routes/
+    ├── +layout.svelte       ← root layout (favicon, global CSS)
+    ├── +page.svelte         ← upload page (file picker, encrypt & upload)
+    └── f/
+        └── [id]/
+            └── +page.svelte ← download page (fetch, decrypt, save)
 ```
 
-You can preview the production build with `npm run preview`.
+## Tech Stack
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+| Component       | Technology                                          |
+|-----------------|-----------------------------------------------------|
+| Framework       | [SvelteKit 2](https://svelte.dev/docs/kit)          |
+| UI              | [Svelte 5](https://svelte.dev/docs/svelte) (runes)  |
+| Language        | [TypeScript 6](https://www.typescriptlang.org/)     |
+| Build           | [Vite 8](https://vite.dev/)                         |
+| CSS             | [TailwindCSS 3](https://tailwindcss.com/)           |
+| Package manager | [Deno](https://deno.com/)                           |
+| Testing         | [Vitest](https://vitest.dev/)                       |
+| Linting         | [ESLint 10](https://eslint.org/) + typescript-eslint |
+| Formatting      | [Prettier 3](https://prettier.io/) + prettier-plugin-svelte |
+
+See [AGENTS.md](AGENTS.md) for detailed conventions, design decisions, and agent guidance.
