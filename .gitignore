@@ -1,0 +1,11 @@
+backend/target
+backend/.idea
+backend/.vscode
+backend/.zed
+frontend/node_modules
+frontend/.svelte-kit
+frontend/.vscode
+frontend/.idea
+frontend/.zed
+**/*/.DS_Store
+.DS_Store
