@@ -4,17 +4,19 @@
 
 This is a **file-sharing monorepo** that enables secure, end-to-end encrypted file transfers. A user picks a file in the browser, the frontend encrypts it client-side with AES-256-GCM, and uploads the ciphertext directly to Cloudflare R2 via presigned URLs. The recipient receives a capability URL with the decryption key embedded in the hash fragment — the key never touches the server. Files are deleted from storage immediately after the first download ("burn after reading").
 
-The repo contains two sub-projects:
+The repo contains three sub-projects:
 
 | Sub-project | Path          | Language      | Description                                      |
 |-------------|---------------|---------------|--------------------------------------------------|
 | Backend API | `backend/`    | Rust (Axum)   | Presigned URL generation, multipart orchestration, burn-after-read download |
 | Frontend    | `frontend/`   | TypeScript (SvelteKit) | Upload UI, client-side encryption/decryption, capability URL handling |
+| Workers    | `worker/`     | Rust (standalone) | Background maintenance jobs (e.g. orphaned upload cleanup) |
 
 Each sub-project has its own `AGENTS.md` with detailed setup, testing, and contribution guidance:
 
 - `backend/AGENTS.md` — Rust toolchain, `cargo nextest` for testing
 - `frontend/AGENTS.md` — Deno package manager, Vitest for testing
+- `worker/AGENTS.md` — Rust standalone workers, S3/R2 client, periodic cleanup jobs
 
 ## Architecture
 
@@ -105,7 +107,7 @@ R2_BUCKET=<bucket name>
 
 Optionally set `RUST_LOG` for tracing verbosity (e.g., `RUST_LOG=info,backend=debug`).
 
-### Starting Both Services
+### Starting All Services
 
 Terminal 1 — Backend:
 
@@ -121,6 +123,14 @@ Terminal 2 — Frontend:
 cd frontend
 deno task dev
 # Listening on http://localhost:5173
+```
+
+Terminal 3 — Cleanup worker (run periodically):
+
+```bash
+cd worker/cleanup-orphaned-uploads
+cargo run
+# Scans R2, aborts orphaned uploads older than 6 hours, then exits
 ```
 
 ### URLs
@@ -142,6 +152,8 @@ For language-specific setup, testing commands, code conventions, and contributio
 
 - **[backend/AGENTS.md](backend/AGENTS.md)** — Rust edition 2024, Axum 0.8, `cargo nextest`, tracing, S3/R2 client, handler patterns, error handling conventions
 - **[frontend/AGENTS.md](frontend/AGENTS.md)** — Deno, SvelteKit 2, Svelte 5 runes, Vitest, TailwindCSS, ESLint + Prettier, `$lib` module conventions
+- **[worker/AGENTS.md](worker/AGENTS.md)** — Rust standalone workers, S3/R2 client, cleanup jobs, Docker deployment
+- **[worker/AGENTS.md](worker/AGENTS.md)** — Rust standalone workers, S3/R2 client, cleanup jobs, Docker deployment
 
 ## Common Cross-Cutting Tasks
 
@@ -168,4 +180,4 @@ For local development without hitting R2, you can run MinIO or use the `aws-smit
 - **.gitignore** at the root covers build artifacts for both projects (`backend/target`, `frontend/node_modules`, `frontend/.svelte-kit`, IDE configs, `.env` files).
 - **docker-compose.yml** exists as a placeholder for future containerized deployment.
 - **No shared code** between backend and frontend — they communicate solely over HTTP with JSON.
-- **Both AGENTS.md files** should be kept up to date when conventions or dependencies change.
+- **All three AGENTS.md files** should be kept up to date when conventions or dependencies change.

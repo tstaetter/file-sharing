@@ -17,7 +17,19 @@ deno install
 
 ### Environment
 
-The backend base URL is configured via `PUBLIC_API_PREFIX` in `frontend/.env` (default: `http://localhost:8000/v1`). Make sure the backend is running, or update `.env` if the backend is deployed elsewhere.
+Create a `frontend/.env` file (or set the variable in your deployment environment):
+
+```env
+PUBLIC_API_PREFIX=http://localhost:8000/v1
+```
+
+SvelteKit requires browser-accessible environment variables to be prefixed with `PUBLIC_`. They are imported in client-side code via `$env/static/public`:
+
+```typescript
+import { PUBLIC_API_PREFIX } from '$env/static/public';
+```
+
+Make sure the backend is running, or update `PUBLIC_API_PREFIX` if the backend is deployed elsewhere.
 
 ### Run
 
