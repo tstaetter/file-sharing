@@ -11,3 +11,4 @@ frontend/.zed
 .DS_Store
 .env
 **/*/.env
+.idea
