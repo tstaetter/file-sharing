@@ -1,5 +1,5 @@
 {
-	"name": "shazoneSDK",
+	"name": "sha-zone-sdk",
 	"version": "0.0.1",
 	"description": "Client-side SDK for end-to-end encrypted file sharing — upload, download, encrypt, and decrypt files directly in the browser using AES-256-GCM and the Web Crypto API.",
 	"type": "module",
