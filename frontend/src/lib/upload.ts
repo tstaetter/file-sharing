@@ -1,82 +1,19 @@
-import { generateKey, encryptChunk } from './crypto';
-import { chunkFile } from './chunk';
+import { uploadFile as sdkUploadFile, type UploadResult } from 'shazoneSDK';
 import { PUBLIC_API_PREFIX } from '$env/static/public';
 
-interface CreateUploadResponse {
-	upload_id: string;
-	key: string;
-}
+export type { UploadResult };
 
-interface SignedUrl {
-	url: string;
-}
-
-interface PartETag {
-	part_number: number;
-	etag: string | null;
-}
-
-interface UploadResult {
-	raw: Uint8Array;
-	fileId: string;
-}
-
+/**
+ * Encrypts a file client-side and uploads it directly to R2 storage.
+ *
+ * This is a thin wrapper around the `shazoneSDK` package that binds the
+ * backend API URL from the SvelteKit environment (`PUBLIC_API_PREFIX`).
+ *
+ * @param file The `File` object to upload (from an `<input type="file">` or
+ *             drag-and-drop).
+ * @returns The raw AES key bytes and the file's UUID, which can be passed to
+ *          `createCapabilityUrl` to build a shareable download link.
+ */
 export async function uploadFile(file: File): Promise<UploadResult> {
-	const { key, raw } = await generateKey();
-	const fileId = crypto.randomUUID();
-
-	const init = await fetch(`${PUBLIC_API_PREFIX}/create-upload`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ file_id: fileId, content_type: file.type || null })
-	});
-	const { upload_id, key: storageKey } = (await init.json()) as CreateUploadResponse;
-
-	let part = 1;
-	const parts: PartETag[] = [];
-
-	for await (const chunk of chunkFile(file)) {
-		const { iv, data } = await encryptChunk(key, chunk);
-
-		const payload = new Uint8Array(iv.length + data.length);
-		payload.set(iv);
-		payload.set(data, iv.length);
-
-		const res = await fetch(`${PUBLIC_API_PREFIX}/sign-parts`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				key: storageKey,
-				upload_id,
-				part_numbers: [part]
-			})
-		});
-
-		const urls = (await res.json()) as SignedUrl[];
-		const url = urls[0].url;
-
-		const uploadRes = await fetch(url, {
-			method: 'PUT',
-			body: payload
-		});
-
-		parts.push({
-			part_number: part,
-			etag: uploadRes.headers.get('ETag')
-		});
-
-		part++;
-	}
-
-	await fetch(`${PUBLIC_API_PREFIX}/complete-upload`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({
-			key: storageKey,
-			upload_id,
-			parts
-		})
-	});
-
-	return { raw, fileId };
+	return sdkUploadFile(PUBLIC_API_PREFIX, file);
 }

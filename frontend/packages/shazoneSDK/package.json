@@ -1,0 +1,46 @@
+{
+	"name": "shazoneSDK",
+	"version": "0.0.1",
+	"description": "Client-side SDK for end-to-end encrypted file sharing — upload, download, encrypt, and decrypt files directly in the browser using AES-256-GCM and the Web Crypto API.",
+	"type": "module",
+	"license": "MIT",
+	"keywords": [
+		"file-sharing",
+		"end-to-end-encryption",
+		"aes-256-gcm",
+		"web-crypto",
+		"client-side-encryption",
+		"capability-url",
+		"burn-after-reading"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/shazone/file-sharing"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"types": "./dist/index.d.ts",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"files": [
+		"dist/"
+	],
+	"scripts": {
+		"build": "tsc",
+		"check": "tsc --noEmit",
+		"prepublishOnly": "npm run build"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"typescript": "^6.0.2"
+	},
+	"peerDependencies": {},
+	"engines": {
+		"node": ">=18.0.0"
+	},
+	"sideEffects": false
+}

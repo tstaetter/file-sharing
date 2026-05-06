@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { uploadFile } from '$lib/upload';
-	import { createCapabilityUrl } from '$lib/wasm';
+	import { createCapabilityUrl } from '$lib';
 	import { PUBLIC_PREFIX } from '$env/static/public';
 
 	let file = $state<File | undefined>(undefined);
