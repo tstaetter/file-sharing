@@ -2,6 +2,6 @@
 import './chunk';
 import './crypto';
 import { uploadFile } from './upload';
-import { createCapabilityUrl } from './wasm';
+import { createCapabilityUrl } from './cap_url';
 
 export default { uploadFile, createCapabilityUrl };
