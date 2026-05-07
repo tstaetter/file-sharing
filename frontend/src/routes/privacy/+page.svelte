@@ -8,6 +8,25 @@
 
 <svelte:head>
 	<title>Privacy Policy — sha.zone</title>
+	<meta
+		name="description"
+		content="Privacy Policy for sha.zone. Learn how we handle your data, including end-to-end encryption, burn-after-reading file deletion, and our commitment to zero tracking."
+	/>
+	<meta name="robots" content="index, follow" />
+	<meta property="og:title" content="Privacy Policy — sha.zone" />
+	<meta
+		property="og:description"
+		content="Privacy Policy for sha.zone. End-to-end encrypted file sharing with zero tracking and automatic file deletion after download."
+	/>
+	<meta property="og:url" content="https://sha.zone/privacy" />
+	<meta property="og:type" content="website" />
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content="Privacy Policy — sha.zone" />
+	<meta
+		name="twitter:description"
+		content="Privacy Policy for sha.zone. Learn how we protect your data with end-to-end encryption and automatic deletion."
+	/>
+	<link rel="canonical" href="https://sha.zone/privacy" />
 </svelte:head>
 
 <div class="w-full max-w-2xl">

@@ -26,6 +26,51 @@
 	}
 </script>
 
+<svelte:head>
+	<title>sha.zone — Secure End-to-End Encrypted File Sharing</title>
+	<meta
+		name="description"
+		content="Share files securely with end-to-end AES-256-GCM encryption. Files are encrypted in your browser and deleted after download. No accounts, no tracking, no server access to your data."
+	/>
+	<meta property="og:title" content="sha.zone — Secure End-to-End Encrypted File Sharing" />
+	<meta
+		property="og:description"
+		content="Share files securely with end-to-end AES-256-GCM encryption. Files are encrypted in your browser and deleted after download. No accounts, no tracking."
+	/>
+	<meta property="og:url" content="https://sha.zone" />
+	<meta property="og:type" content="website" />
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content="sha.zone — Secure End-to-End Encrypted File Sharing" />
+	<meta
+		name="twitter:description"
+		content="Share files securely with end-to-end AES-256-GCM encryption. Files are encrypted in your browser and deleted after download."
+	/>
+	<link rel="canonical" href="https://sha.zone" />
+	<script type="application/ld+json">
+		{{
+			"@context": "https://schema.org",
+			"@type": "WebApplication",
+			"name": "sha.zone",
+			"url": "https://sha.zone",
+			"description": "End-to-end encrypted file sharing. Files are encrypted in your browser and deleted after download.",
+			"applicationCategory": "UtilityApplication",
+			"operatingSystem": "Any",
+			"offers": {{
+				"@type": "Offer",
+				"price": "0",
+				"priceCurrency": "USD"
+			}},
+			"featureList": [
+				"End-to-end AES-256-GCM encryption",
+				"Client-side encryption — server never sees plaintext",
+				"Burn-after-reading — files deleted after first download",
+				"No account required",
+				"No tracking or analytics"
+			]
+		}}
+	</script>
+</svelte:head>
+
 <div class="w-full max-w-lg">
 	<!-- Card -->
 	<div class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-8">

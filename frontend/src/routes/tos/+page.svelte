@@ -8,6 +8,25 @@
 
 <svelte:head>
 	<title>Terms of Service — sha.zone</title>
+	<meta
+		name="description"
+		content="Terms of Service for sha.zone. Learn about the terms governing our end-to-end encrypted file sharing service, including user responsibilities, data retention, and acceptable use."
+	/>
+	<meta name="robots" content="index, follow" />
+	<meta property="og:title" content="Terms of Service — sha.zone" />
+	<meta
+		property="og:description"
+		content="Terms of Service for sha.zone. Learn about the terms governing our end-to-end encrypted file sharing service."
+	/>
+	<meta property="og:url" content="https://sha.zone/tos" />
+	<meta property="og:type" content="website" />
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content="Terms of Service — sha.zone" />
+	<meta
+		name="twitter:description"
+		content="Terms of Service for sha.zone end-to-end encrypted file sharing."
+	/>
+	<link rel="canonical" href="https://sha.zone/tos" />
 </svelte:head>
 
 <div class="w-full max-w-2xl">

@@ -8,6 +8,25 @@
 
 <svelte:head>
 	<title>Cookie Policy — sha.zone</title>
+	<meta
+		name="description"
+		content="Cookie Policy for sha.zone. We don't use tracking, advertising, or analytics cookies. Learn about the minimal browser storage we use and how Cloudflare's security cookies work."
+	/>
+	<meta name="robots" content="index, follow" />
+	<meta property="og:title" content="Cookie Policy — sha.zone" />
+	<meta
+		property="og:description"
+		content="Cookie Policy for sha.zone. No tracking cookies, no analytics, no ads. Learn about our minimal approach to browser storage."
+	/>
+	<meta property="og:url" content="https://sha.zone/cookies" />
+	<meta property="og:type" content="website" />
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content="Cookie Policy — sha.zone" />
+	<meta
+		name="twitter:description"
+		content="Cookie Policy for sha.zone. No tracking, no analytics, no advertising cookies."
+	/>
+	<link rel="canonical" href="https://sha.zone/cookies" />
 </svelte:head>
 
 <div class="w-full max-w-2xl">

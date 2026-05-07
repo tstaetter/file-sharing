@@ -1,3 +1,7 @@
-# allow crawling everything by default
+# https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /f/
+
+# Sitemap
+Sitemap: https://sha.zone/sitemap.xml

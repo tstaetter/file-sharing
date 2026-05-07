@@ -36,6 +36,21 @@
 	});
 </script>
 
+<svelte:head>
+	<title>Decrypting your file — sha.zone</title>
+	<meta
+		name="description"
+		content="Download your encrypted file. Files are decrypted in your browser and deleted from the server after download."
+	/>
+	<meta name="robots" content="noindex, nofollow" />
+	<meta property="og:title" content="Download your file — sha.zone" />
+	<meta
+		property="og:description"
+		content="Download your encrypted file. Files are decrypted in your browser and deleted from the server after download."
+	/>
+	<meta name="twitter:card" content="summary" />
+</svelte:head>
+
 <div class="w-full max-w-lg">
 	<div class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-8">
 		<!-- Icon -->
