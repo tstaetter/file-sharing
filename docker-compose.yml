@@ -6,21 +6,12 @@ services:
     container_name: file-sharing-backend
     ports:
       - "8000:8000"
-    env_file:
-      - .env
+    # env_file:
+    #  - .env
     restart: unless-stopped
     healthcheck:
       test:
-        [
-          "CMD",
-          "curl",
-          "-f",
-          "http://localhost:8000/create-upload",
-          "-H",
-          "Content-Type: application/json",
-          "-d",
-          '{"file_id":"healthcheck"}',
-        ]
+        ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:8000/v1/"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,12 +21,20 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # PUBLIC_API_PREFIX is baked into the client bundle at build time by Vite.
+        # Override for production: docker compose build --build-arg PUBLIC_API_PREFIX=https://api.example.com/v1
+        PUBLIC_API_PREFIX: http://localhost:8000/v1
     container_name: file-sharing-frontend
     ports:
-      - "5173:5173"
+      - "5173:3000"
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
     environment:
-      - VITE_BACKEND_URL=http://localhost:8000
+      # SvelteKit adapter-node runtime vars
+      - PORT=3000
+      # ORIGIN must match the external URL users see in the browser.
+      # Override for production: ORIGIN=https://sha.zone
+      - ORIGIN=http://localhost:5173
