@@ -73,6 +73,7 @@ export async function downloadFile(apiPrefix, fileId, rawKey, onProgress) {
     const pending = [];
     let pendingSize = 0;
     let totalDownloaded = 0;
+    let chunksDecrypted = 0;
     if (res.body) {
         const reader = res.body.getReader();
         try {
@@ -91,11 +92,17 @@ export async function downloadFile(apiPrefix, fileId, rawKey, onProgress) {
                     const ciphertext = encryptedChunk.subarray(IV_LEN);
                     const plaintext = await decryptChunk(cryptoKey, iv, ciphertext);
                     plaintextChunks.push(plaintext);
+                    chunksDecrypted++;
                 }
-                // Report progress based on download bytes (5%–90%).
-                // Since we decrypt as we download, download progress ≈ overall progress.
+                // Report progress (5%–90%).
+                // With Content-Length: precise byte-level progress.
+                // Without: decelerating curve based on chunks decrypted — always
+                // moves visibly but never falsely reaches 100% before we're done.
                 if (contentLength > 0) {
                     onProgress?.(0.05 + 0.85 * (totalDownloaded / contentLength));
+                }
+                else if (chunksDecrypted > 0) {
+                    onProgress?.(0.05 + 0.85 * (1 - Math.pow(0.97, chunksDecrypted)));
                 }
             }
         }
@@ -107,7 +114,9 @@ export async function downloadFile(apiPrefix, fileId, rawKey, onProgress) {
         // Fallback for environments without ReadableStream (rare in modern browsers).
         // This loads the entire response into memory — not suitable for very large files.
         const buffer = new Uint8Array(await res.arrayBuffer());
+        const totalChunks = Math.ceil(buffer.length / encryptedChunkSize);
         let offset = 0;
+        let fallbackChunkIndex = 0;
         while (offset < buffer.length) {
             const size = Math.min(encryptedChunkSize, buffer.length - offset);
             const encryptedChunk = buffer.subarray(offset, offset + size);
@@ -115,7 +124,16 @@ export async function downloadFile(apiPrefix, fileId, rawKey, onProgress) {
             const ciphertext = encryptedChunk.subarray(IV_LEN);
             const plaintext = await decryptChunk(cryptoKey, iv, ciphertext);
             plaintextChunks.push(plaintext);
+            fallbackChunkIndex++;
             offset += size;
+            // Report progress (5%–90%) — precise if we know the total chunks,
+            // otherwise use the decelerating curve.
+            if (totalChunks > 0) {
+                onProgress?.(0.05 + 0.85 * (fallbackChunkIndex / totalChunks));
+            }
+            else {
+                onProgress?.(0.05 + 0.85 * (1 - Math.pow(0.97, fallbackChunkIndex)));
+            }
         }
     }
     // Process the final (possibly short) encrypted chunk remaining in the buffer.

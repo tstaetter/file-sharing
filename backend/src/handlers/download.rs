@@ -39,6 +39,7 @@ pub async fn download(
 
     // 2. Extract metadata from the S3 response
     let content_type: Option<String> = resp.content_type().map(String::from);
+    let content_length: Option<i64> = resp.content_length();
     let chunk_size: Option<u64> = resp
         .metadata()
         .and_then(|m| m.get("chunk-size"))
@@ -87,6 +88,10 @@ pub async fn download(
             HeaderName::from_static("x-content-type"),
             ct.parse().unwrap(),
         );
+    }
+
+    if let Some(cl) = content_length {
+        headers.insert(header::CONTENT_LENGTH, cl.to_string().parse().unwrap());
     }
 
     if let Some(cs) = chunk_size {
