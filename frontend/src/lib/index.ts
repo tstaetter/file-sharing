@@ -20,7 +20,8 @@ export type {
 	PartETag,
 	UploadResult,
 	StoredFile,
-	DownloadResult
+	DownloadResult,
+	ProgressCallback
 } from '../../packages/shazoneSDK';
 
 // Convenience wrapper that binds the backend URL from SvelteKit's environment

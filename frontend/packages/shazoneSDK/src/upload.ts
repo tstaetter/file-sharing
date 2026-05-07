@@ -26,6 +26,9 @@ export interface UploadResult {
 	fileId: string;
 }
 
+/** Callback for tracking upload progress. Receives a value between 0 and 1. */
+export type ProgressCallback = (progress: number) => void;
+
 /**
  * Encrypts a file client-side and uploads it directly to R2 storage via
  * the file-sharing backend API.
@@ -40,8 +43,10 @@ export interface UploadResult {
  * **The backend never sees plaintext** — all encryption happens locally
  * in the browser using the Web Crypto API.
  *
- * @param apiPrefix The base URL of the backend API, e.g. `"https://api.sha.zone/v1"`.
- * @param file      The `File` object to upload (from an `<input type="file">` or drag-and-drop).
+ * @param apiPrefix  The base URL of the backend API, e.g. `"https://api.sha.zone/v1"`.
+ * @param file       The `File` object to upload (from an `<input type="file">` or drag-and-drop).
+ * @param onProgress Optional callback invoked after each chunk is uploaded.
+ *                    Receives a number between 0 (just started) and 1 (all chunks uploaded).
  * @returns The raw AES key bytes and the file's UUID, which can be used with
  *          `createCapabilityUrl` to build a shareable download link.
  *
@@ -51,14 +56,19 @@ export interface UploadResult {
  *
  * const input = document.querySelector('input[type=file]');
  * const file = input.files[0];
- * const result = await uploadFile('https://api.sha.zone/v1', file);
+ * const result = await uploadFile('https://api.sha.zone/v1', file, (p) => console.log(`${(p * 100).toFixed(0)}%`));
  * const url = createCapabilityUrl('https://sha.zone', result.fileId, result.raw);
  * console.log('Share this link:', url);
  * ```
  */
-export async function uploadFile(apiPrefix: string, file: File): Promise<UploadResult> {
+export async function uploadFile(
+	apiPrefix: string,
+	file: File,
+	onProgress?: ProgressCallback
+): Promise<UploadResult> {
 	const { key, raw } = await generateKey();
 	const fileId = crypto.randomUUID();
+	const totalChunks = Math.max(1, Math.ceil(file.size / DEFAULT_CHUNK_SIZE));
 
 	const init = await fetch(`${apiPrefix}/create-upload`, {
 		method: 'POST',
@@ -138,6 +148,7 @@ export async function uploadFile(apiPrefix: string, file: File): Promise<UploadR
 			etag: uploadRes.headers.get('ETag')
 		});
 
+		onProgress?.(part / totalChunks);
 		part++;
 	}
 

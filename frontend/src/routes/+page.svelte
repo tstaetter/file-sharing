@@ -8,6 +8,7 @@
 	let link = $state('');
 	let uploading = $state(false);
 	let fileName = $state('');
+	let progress = $state(0);
 
 	function handleFile(e: Event) {
 		const f = (e.target as HTMLInputElement).files?.[0];
@@ -18,8 +19,9 @@
 	async function upload() {
 		if (!file) return;
 		uploading = true;
+		progress = 0;
 		try {
-			const { raw, fileId } = await uploadFile(file);
+			const { raw, fileId } = await uploadFile(file, (p) => (progress = p));
 			link = await createCapabilityUrl(PUBLIC_PREFIX, fileId, raw);
 		} finally {
 			uploading = false;
@@ -139,28 +141,27 @@
 				: 'bg-slate-100 text-slate-400 cursor-not-allowed'}"
 		>
 			{#if uploading}
-				<span class="flex items-center justify-center gap-2">
-					<svg class="animate-spin w-4 h-4 text-violet-300" fill="none" viewBox="0 0 24 24">
-						<circle
-							class="opacity-25"
-							cx="12"
-							cy="12"
-							r="10"
-							stroke="currentColor"
-							stroke-width="4"
-						/>
-						<path
-							class="opacity-75"
-							fill="currentColor"
-							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-						/>
-					</svg>
-					Encrypting &amp; uploading…
-				</span>
+				Uploading…
 			{:else}
 				Encrypt &amp; upload
 			{/if}
 		</button>
+
+		<!-- Progress bar -->
+		{#if uploading}
+			<div class="mt-5">
+				<div class="flex items-center justify-between mb-1.5">
+					<span class="text-xs text-violet-600 font-medium">Encrypting &amp; uploading…</span>
+					<span class="text-xs text-violet-500">{(progress * 100).toFixed(0)}%</span>
+				</div>
+				<div class="w-full h-2 bg-violet-100 rounded-full overflow-hidden">
+					<div
+						class="h-full bg-gradient-to-r from-violet-500 to-violet-600 rounded-full transition-all duration-300 ease-out"
+						style="width: {progress * 100}%"
+					></div>
+				</div>
+			</div>
+		{/if}
 
 		<!-- Result link -->
 		{#if link}

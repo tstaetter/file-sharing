@@ -14,8 +14,10 @@ import { chunkFile, DEFAULT_CHUNK_SIZE } from './chunk';
  * **The backend never sees plaintext** — all encryption happens locally
  * in the browser using the Web Crypto API.
  *
- * @param apiPrefix The base URL of the backend API, e.g. `"https://api.sha.zone/v1"`.
- * @param file      The `File` object to upload (from an `<input type="file">` or drag-and-drop).
+ * @param apiPrefix  The base URL of the backend API, e.g. `"https://api.sha.zone/v1"`.
+ * @param file       The `File` object to upload (from an `<input type="file">` or drag-and-drop).
+ * @param onProgress Optional callback invoked after each chunk is uploaded.
+ *                    Receives a number between 0 (just started) and 1 (all chunks uploaded).
  * @returns The raw AES key bytes and the file's UUID, which can be used with
  *          `createCapabilityUrl` to build a shareable download link.
  *
@@ -25,14 +27,15 @@ import { chunkFile, DEFAULT_CHUNK_SIZE } from './chunk';
  *
  * const input = document.querySelector('input[type=file]');
  * const file = input.files[0];
- * const result = await uploadFile('https://api.sha.zone/v1', file);
+ * const result = await uploadFile('https://api.sha.zone/v1', file, (p) => console.log(`${(p * 100).toFixed(0)}%`));
  * const url = createCapabilityUrl('https://sha.zone', result.fileId, result.raw);
  * console.log('Share this link:', url);
  * ```
  */
-export async function uploadFile(apiPrefix, file) {
+export async function uploadFile(apiPrefix, file, onProgress) {
     const { key, raw } = await generateKey();
     const fileId = crypto.randomUUID();
+    const totalChunks = Math.max(1, Math.ceil(file.size / DEFAULT_CHUNK_SIZE));
     const init = await fetch(`${apiPrefix}/create-upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -97,6 +100,7 @@ export async function uploadFile(apiPrefix, file) {
             part_number: part,
             etag: uploadRes.headers.get('ETag')
         });
+        onProgress?.(part / totalChunks);
         part++;
     }
     const completeRes = await fetch(`${apiPrefix}/complete-upload`, {

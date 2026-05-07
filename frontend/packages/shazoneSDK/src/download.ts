@@ -22,6 +22,8 @@ export interface StoredFile {
 	chunk_size?: number | null;
 }
 
+import type { ProgressCallback } from './upload';
+
 /** The result of a successful download and decryption. */
 export interface DownloadResult {
 	/** The decrypted file contents as a Blob, ready to be saved to disk. */
@@ -45,10 +47,11 @@ export interface DownloadResult {
  * The backend deletes the file from R2 **immediately after serving it**
  * ("burn after reading"), so a file can only be downloaded once.
  *
- * @param apiPrefix The base URL of the backend API (e.g. `"https://api.sha.zone/v1"`).
- * @param fileId    The UUID of the file to download.
- * @param rawKey    The raw AES-256 key bytes (extracted from the capability URL hash).
- * @returns A `DownloadResult` containing the decrypted Blob and a suggested file name.
+ * @param apiPrefix  The base URL of the backend API (e.g. `"https://api.sha.zone/v1"`).
+ * @param fileId     The UUID of the file to download.
+ * @param rawKey     The raw AES-256 key bytes (extracted from the capability URL hash).
+ * @param onProgress Optional callback invoked during download and decryption.
+ *                    Receives a number between 0 (just started) and 1 (fully decrypted).
  *
  * @example
  * ```ts
@@ -57,7 +60,7 @@ export interface DownloadResult {
  * // Key extracted from the URL hash fragment
  * const rawKey = base64ToBytes(location.hash.slice(1));
  * const id = page.params.id; // from routing
- * const { blob, fileName } = await downloadFile('https://api.sha.zone/v1', id, rawKey);
+ * const { blob, fileName } = await downloadFile('https://api.sha.zone/v1', id, rawKey, (p) => console.log(`${(p * 100).toFixed(0)}%`));
  *
  * const a = document.createElement('a');
  * a.href = URL.createObjectURL(blob);
@@ -68,17 +71,46 @@ export interface DownloadResult {
 export async function downloadFile(
 	apiPrefix: string,
 	fileId: string,
-	rawKey: Uint8Array
+	rawKey: Uint8Array,
+	onProgress?: ProgressCallback
 ): Promise<DownloadResult> {
+	onProgress?.(0);
+
 	const res = await fetch(`${apiPrefix}/f/${fileId}`);
 
 	if (!res.ok) {
 		throw new Error(`failed to fetch file: ${res.status} ${res.statusText}`);
 	}
 
-	const body: StoredFile = await res.json();
+	// Track download progress via the readable stream if Content-Length is available.
+	const contentLength = res.headers.get('Content-Length');
+	let body: StoredFile;
 
-	const { blob, contentType } = await decryptFile(body, rawKey);
+	if (contentLength && res.body) {
+		const total = parseInt(contentLength, 10);
+		const reader = res.body.getReader();
+		const chunks: Uint8Array[] = [];
+		let downloaded = 0;
+
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			chunks.push(value);
+			downloaded += value.length;
+			// Download phase accounts for the first 50% of progress
+			onProgress?.(0.5 * (downloaded / total));
+		}
+
+		const decoder = new TextDecoder();
+		body = JSON.parse(
+			chunks.map((c) => decoder.decode(c, { stream: true })).join('') + decoder.decode()
+		);
+	} else {
+		body = await res.json();
+	}
+
+	// Decrypt phase accounts for the remaining 50%
+	const { blob, contentType } = await decryptFile(body, rawKey, (p) => onProgress?.(0.5 + 0.5 * p));
 
 	const ext = extensionFromMime(contentType);
 	const fileName = `download.${ext}`;
@@ -94,8 +126,10 @@ export async function downloadFile(
  * `IV (12 bytes) || ciphertext || GCM tag (16 bytes)` blocks and
  * decrypts each one independently.
  *
- * @param stored The JSON payload returned by `GET /v1/f/{id}`.
- * @param rawKey The raw AES-256 key bytes.
+ * @param stored    The JSON payload returned by `GET /v1/f/{id}`.
+ * @param rawKey    The raw AES-256 key bytes.
+ * @param onProgress Optional callback invoked after each chunk is decrypted.
+ *                    Receives a number between 0 and 1.
  * @returns The assembled plaintext Blob and the original content type.
  *
  * @example
@@ -109,7 +143,8 @@ export async function downloadFile(
  */
 export async function decryptFile(
 	stored: StoredFile,
-	rawKey: Uint8Array
+	rawKey: Uint8Array,
+	onProgress?: ProgressCallback
 ): Promise<{ blob: Blob; contentType: string }> {
 	const cryptoKey = await importKey(rawKey);
 	const encryptedBytes = dataToBytes(stored.data);
@@ -131,11 +166,13 @@ export async function decryptFile(
 
 	// --- decrypt each chunk ---
 	const plaintextChunks: Uint8Array[] = [];
-	for (const chunk of chunks) {
+	for (let i = 0; i < chunks.length; i++) {
+		const chunk = chunks[i]!;
 		const iv = chunk.slice(0, IV_LEN);
 		const ciphertext = chunk.slice(IV_LEN);
 		const plaintext = await decryptChunk(cryptoKey, iv, ciphertext);
 		plaintextChunks.push(plaintext);
+		onProgress?.((i + 1) / chunks.length);
 	}
 
 	// --- reassemble ---

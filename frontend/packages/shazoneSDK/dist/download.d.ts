@@ -12,6 +12,7 @@ export interface StoredFile {
     /** The plaintext chunk size in bytes used during upload, if provided by the server. */
     chunk_size?: number | null;
 }
+import type { ProgressCallback } from './upload';
 /** The result of a successful download and decryption. */
 export interface DownloadResult {
     /** The decrypted file contents as a Blob, ready to be saved to disk. */
@@ -34,10 +35,11 @@ export interface DownloadResult {
  * The backend deletes the file from R2 **immediately after serving it**
  * ("burn after reading"), so a file can only be downloaded once.
  *
- * @param apiPrefix The base URL of the backend API (e.g. `"https://api.sha.zone/v1"`).
- * @param fileId    The UUID of the file to download.
- * @param rawKey    The raw AES-256 key bytes (extracted from the capability URL hash).
- * @returns A `DownloadResult` containing the decrypted Blob and a suggested file name.
+ * @param apiPrefix  The base URL of the backend API (e.g. `"https://api.sha.zone/v1"`).
+ * @param fileId     The UUID of the file to download.
+ * @param rawKey     The raw AES-256 key bytes (extracted from the capability URL hash).
+ * @param onProgress Optional callback invoked during download and decryption.
+ *                    Receives a number between 0 (just started) and 1 (fully decrypted).
  *
  * @example
  * ```ts
@@ -46,7 +48,7 @@ export interface DownloadResult {
  * // Key extracted from the URL hash fragment
  * const rawKey = base64ToBytes(location.hash.slice(1));
  * const id = page.params.id; // from routing
- * const { blob, fileName } = await downloadFile('https://api.sha.zone/v1', id, rawKey);
+ * const { blob, fileName } = await downloadFile('https://api.sha.zone/v1', id, rawKey, (p) => console.log(`${(p * 100).toFixed(0)}%`));
  *
  * const a = document.createElement('a');
  * a.href = URL.createObjectURL(blob);
@@ -54,7 +56,7 @@ export interface DownloadResult {
  * a.click();
  * ```
  */
-export declare function downloadFile(apiPrefix: string, fileId: string, rawKey: Uint8Array): Promise<DownloadResult>;
+export declare function downloadFile(apiPrefix: string, fileId: string, rawKey: Uint8Array, onProgress?: ProgressCallback): Promise<DownloadResult>;
 /**
  * Decrypts an already-fetched `StoredFile` payload into a Blob.
  *
@@ -63,8 +65,10 @@ export declare function downloadFile(apiPrefix: string, fileId: string, rawKey: 
  * `IV (12 bytes) || ciphertext || GCM tag (16 bytes)` blocks and
  * decrypts each one independently.
  *
- * @param stored The JSON payload returned by `GET /v1/f/{id}`.
- * @param rawKey The raw AES-256 key bytes.
+ * @param stored    The JSON payload returned by `GET /v1/f/{id}`.
+ * @param rawKey    The raw AES-256 key bytes.
+ * @param onProgress Optional callback invoked after each chunk is decrypted.
+ *                    Receives a number between 0 and 1.
  * @returns The assembled plaintext Blob and the original content type.
  *
  * @example
@@ -76,7 +80,7 @@ export declare function downloadFile(apiPrefix: string, fileId: string, rawKey: 
  * const { blob } = await decryptFile(stored, rawKey);
  * ```
  */
-export declare function decryptFile(stored: StoredFile, rawKey: Uint8Array): Promise<{
+export declare function decryptFile(stored: StoredFile, rawKey: Uint8Array, onProgress?: ProgressCallback): Promise<{
     blob: Blob;
     contentType: string;
 }>;

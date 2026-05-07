@@ -7,6 +7,7 @@
 
 	let error = $state<string | null>(null);
 	let loading = $state(true);
+	let progress = $state(0);
 	let downloadUrl = $state<string | null>(null);
 	let fileName = $state<string>('download');
 
@@ -21,7 +22,7 @@
 
 			const id = page.params.id;
 			const rawKey = base64ToBytes(key);
-			const result = await downloadFile(PUBLIC_API_PREFIX, id, rawKey);
+			const result = await downloadFile(PUBLIC_API_PREFIX, id, rawKey, (p) => (progress = p));
 
 			fileName = result.fileName;
 			downloadUrl = URL.createObjectURL(result.blob);
@@ -62,23 +63,17 @@
 		<h1 class="text-2xl font-semibold text-slate-800 text-center mb-6">Decrypting your file</h1>
 
 		{#if loading}
-			<div class="flex flex-col items-center gap-4 py-8">
-				<svg class="animate-spin w-10 h-10 text-violet-500" fill="none" viewBox="0 0 24 24">
-					<circle
-						class="opacity-25"
-						cx="12"
-						cy="12"
-						r="10"
-						stroke="currentColor"
-						stroke-width="4"
-					/>
-					<path
-						class="opacity-75"
-						fill="currentColor"
-						d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-					/>
-				</svg>
-				<p class="text-sm text-slate-500">Fetching and decrypting your file…</p>
+			<div class="py-8">
+				<div class="flex items-center justify-between mb-2">
+					<span class="text-sm text-cyan-600 font-medium">Fetching &amp; decrypting…</span>
+					<span class="text-sm text-cyan-500">{(progress * 100).toFixed(0)}%</span>
+				</div>
+				<div class="w-full h-2.5 bg-cyan-100 rounded-full overflow-hidden">
+					<div
+						class="h-full bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-full transition-all duration-300 ease-out"
+						style="width: {progress * 100}%"
+					></div>
+				</div>
 			</div>
 		{:else if error}
 			<div class="p-4 bg-red-50 border border-red-200 rounded-xl">

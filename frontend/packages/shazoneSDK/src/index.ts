@@ -6,7 +6,13 @@ export { chunkFile, DEFAULT_CHUNK_SIZE } from './chunk';
 
 // ── Upload ──────────────────────────────────────────────────────────
 export { uploadFile } from './upload';
-export type { CreateUploadResponse, SignedUrl, PartETag, UploadResult } from './upload';
+export type {
+	CreateUploadResponse,
+	SignedUrl,
+	PartETag,
+	UploadResult,
+	ProgressCallback
+} from './upload';
 
 // ── Download & decryption ───────────────────────────────────────────
 export { downloadFile, decryptFile } from './download';
