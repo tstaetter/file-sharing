@@ -155,7 +155,7 @@
 						{progress < 0.05
 							? 'Preparing…'
 							: progress < 1
-								? 'Encrypting &amp; uploading…'
+								? 'Encrypting & uploading…'
 								: 'Completing…'}
 					</span>
 					<span class="text-xs text-violet-500">{Math.min(progress * 100, 100).toFixed(0)}%</span>

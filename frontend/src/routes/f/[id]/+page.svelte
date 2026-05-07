@@ -68,11 +68,9 @@
 					<span class="text-sm text-cyan-600 font-medium">
 						{progress < 0.05
 							? 'Connecting…'
-							: progress < 0.1
-								? 'Fetching…'
-								: progress < 0.95
-									? 'Decrypting…'
-									: 'Preparing file…'}
+							: progress < 0.95
+								? 'Downloading & decrypting…'
+								: 'Preparing file…'}
 					</span>
 					<span class="text-sm text-cyan-500">{Math.min(progress * 100, 100).toFixed(0)}%</span>
 				</div>

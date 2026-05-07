@@ -20,16 +20,40 @@ export interface DownloadResult {
 }
 
 /**
+ * Consumes exactly `n` bytes from the front of the `pending` chunk list.
+ * Mutates `pending` in place, shifting fully-consumed chunks and subarraying
+ * partially-consumed ones.  The caller must keep `pendingSize` in sync.
+ */
+function consumeBytes(pending: Uint8Array[], n: number): Uint8Array {
+	const result = new Uint8Array(n);
+	let written = 0;
+	while (written < n && pending.length > 0) {
+		const chunk = pending[0]!;
+		const remaining = n - written;
+		if (chunk.length <= remaining) {
+			// Consume the entire chunk
+			result.set(chunk, written);
+			written += chunk.length;
+			pending.shift();
+		} else {
+			// Consume part of the chunk
+			result.set(chunk.subarray(0, remaining), written);
+			written += remaining;
+			pending[0] = chunk.subarray(remaining);
+		}
+	}
+	return result;
+}
+
+/**
  * Downloads and decrypts a file from the file-sharing backend.
  *
- * The backend now returns raw binary ciphertext with metadata in response
- * headers, rather than a JSON payload. This function:
- * 1. Fetches the encrypted binary stream from `GET /v1/f/{id}`.
- * 2. Reads `X-Content-Type` and `X-Chunk-Size` from response headers.
- * 3. Downloads the binary body, tracking byte-level progress when
- *    `Content-Length` is available.
- * 4. Decrypts the binary data (concatenated `IV || ciphertext || GCM tag` blocks).
- * 5. Assembles the plaintext chunks into a Blob.
+ * The backend streams raw binary ciphertext with metadata in response headers.
+ * This function processes the stream **incrementally** — it buffers incoming
+ * network data only until a complete encrypted chunk (~6 MiB) is assembled,
+ * decrypts it immediately, and releases the encrypted bytes.  Peak memory
+ * is therefore one encrypted chunk plus the accumulated plaintext, making it
+ * safe for files of any size.
  *
  * The backend deletes the file from R2 **immediately after serving it**
  * ("burn after reading"), so a file can only be downloaded once.
@@ -39,21 +63,6 @@ export interface DownloadResult {
  * @param rawKey     The raw AES-256 key bytes (extracted from the capability URL hash).
  * @param onProgress Optional callback invoked during download and decryption.
  *                    Receives a number between 0 (just started) and 1 (fully decrypted).
- *
- * @example
- * ```ts
- * import { downloadFile } from 'shazoneSDK';
- *
- * // Key extracted from the URL hash fragment
- * const rawKey = base64ToBytes(location.hash.slice(1));
- * const id = page.params.id; // from routing
- * const { blob, fileName } = await downloadFile('https://api.sha.zone/v1', id, rawKey, (p) => console.log(`${(p * 100).toFixed(0)}%`));
- *
- * const a = document.createElement('a');
- * a.href = URL.createObjectURL(blob);
- * a.download = fileName;
- * a.click();
- * ```
  */
 export async function downloadFile(
 	apiPrefix: string,
@@ -61,67 +70,111 @@ export async function downloadFile(
 	rawKey: Uint8Array,
 	onProgress?: ProgressCallback
 ): Promise<DownloadResult> {
-	// Milestone-based progress:
-	//   0.00 — started
-	//   0.05 — response headers received
-	//   0.05–0.85 — binary data downloaded (byte-level if Content-Length available)
-	//   0.85–0.95 — decrypting chunks
-	//   0.95 — assembling result
-	//   1.00 — done
 	onProgress?.(0);
 
 	const res = await fetch(`${apiPrefix}/f/${fileId}`);
 	if (!res.ok) {
 		throw new Error(`failed to fetch file: ${res.status} ${res.statusText}`);
 	}
+
 	onProgress?.(0.05);
 
 	// Read metadata from response headers
 	const contentType = res.headers.get('x-content-type') || 'application/octet-stream';
 	const chunkSizeHeader = res.headers.get('x-chunk-size');
 	const chunkSize = chunkSizeHeader ? parseInt(chunkSizeHeader, 10) : LEGACY_CHUNK_SIZE;
-
-	// Download the encrypted binary data with progress tracking
+	const encryptedChunkSize = IV_LEN + chunkSize + GCM_TAG_LEN;
 	const contentLength = parseInt(res.headers.get('Content-Length') || '0', 10);
-	let encryptedBytes: Uint8Array;
 
-	if (contentLength > 0 && res.body) {
-		// Stream with byte-level progress tracking (5%–85%)
+	// Import the AES key once — reused for every chunk
+	const cryptoKey = await importKey(rawKey);
+
+	// Stream-download and decrypt incrementally.
+	// We buffer incoming bytes in `pending`, and whenever we have enough for
+	// a complete encrypted chunk we extract it, decrypt it, and discard the
+	// encrypted bytes.  Peak memory: ~1 encrypted chunk + decrypted chunks.
+	const plaintextChunks: Uint8Array[] = [];
+	const pending: Uint8Array[] = [];
+	let pendingSize = 0;
+	let totalDownloaded = 0;
+
+	if (res.body) {
 		const reader = res.body.getReader();
-		const chunks: Uint8Array[] = [];
-		let downloaded = 0;
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			chunks.push(value);
-			downloaded += value.length;
-			onProgress?.(0.05 + 0.8 * (downloaded / contentLength));
-		}
-		// Combine chunks into a single Uint8Array
-		encryptedBytes = new Uint8Array(downloaded);
-		let offset = 0;
-		for (const chunk of chunks) {
-			encryptedBytes.set(chunk, offset);
-			offset += chunk.length;
+
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+
+				pending.push(value);
+				pendingSize += value.length;
+				totalDownloaded += value.length;
+
+				// Process as many complete encrypted chunks as possible.
+				while (pendingSize >= encryptedChunkSize) {
+					const encryptedChunk = consumeBytes(pending, encryptedChunkSize);
+					pendingSize -= encryptedChunkSize;
+
+					const iv = encryptedChunk.subarray(0, IV_LEN);
+					const ciphertext = encryptedChunk.subarray(IV_LEN);
+					const plaintext = await decryptChunk(cryptoKey, iv, ciphertext);
+					plaintextChunks.push(plaintext);
+				}
+
+				// Report progress based on download bytes (5%–90%).
+				// Since we decrypt as we download, download progress ≈ overall progress.
+				if (contentLength > 0) {
+					onProgress?.(0.05 + 0.85 * (totalDownloaded / contentLength));
+				}
+			}
+		} finally {
+			reader.releaseLock();
 		}
 	} else {
-		// No Content-Length, download all at once
-		const buffer = await res.arrayBuffer();
-		encryptedBytes = new Uint8Array(buffer);
+		// Fallback for environments without ReadableStream (rare in modern browsers).
+		// This loads the entire response into memory — not suitable for very large files.
+		const buffer = new Uint8Array(await res.arrayBuffer());
+		let offset = 0;
+		while (offset < buffer.length) {
+			const size = Math.min(encryptedChunkSize, buffer.length - offset);
+			const encryptedChunk = buffer.subarray(offset, offset + size);
+			const iv = encryptedChunk.subarray(0, IV_LEN);
+			const ciphertext = encryptedChunk.subarray(IV_LEN);
+			const plaintext = await decryptChunk(cryptoKey, iv, ciphertext);
+			plaintextChunks.push(plaintext);
+			offset += size;
+		}
 	}
-	onProgress?.(0.85);
 
-	// Decrypt phase: 85%–95%
-	const { blob } = await decryptBytes(encryptedBytes, chunkSize, rawKey, contentType, (p) =>
-		onProgress?.(0.85 + 0.1 * p)
-	);
+	// Process the final (possibly short) encrypted chunk remaining in the buffer.
+	// A valid final chunk must have at least IV (12) + GCM tag (16) + 1 byte of ciphertext.
+	if (pendingSize > 0) {
+		if (pendingSize < IV_LEN + GCM_TAG_LEN + 1) {
+			throw new Error(
+				`Corrupt stream: remaining ${pendingSize} bytes are too short to form a valid encrypted chunk ` +
+					`(minimum is ${IV_LEN + GCM_TAG_LEN + 1} bytes).`
+			);
+		}
+		const remaining = consumeBytes(pending, pendingSize);
+		pendingSize = 0;
+		const iv = remaining.subarray(0, IV_LEN);
+		const ciphertext = remaining.subarray(IV_LEN);
+		const plaintext = await decryptChunk(cryptoKey, iv, ciphertext);
+		plaintextChunks.push(plaintext);
+	}
 
 	onProgress?.(0.95);
+
+	// Assemble the plaintext chunks into a Blob.
+	// Blob(chunks) references each chunk's underlying ArrayBuffer without
+	// creating a second contiguous copy — the Blob just holds pointers.
+	const blob = new Blob(plaintextChunks as BlobPart[], { type: contentType });
+
+	onProgress?.(1);
 
 	const ext = extensionFromMime(contentType);
 	const fileName = `download.${ext}`;
 
-	onProgress?.(1);
 	return { blob, fileName };
 }
 
@@ -129,8 +182,9 @@ export async function downloadFile(
  * Decrypts raw binary ciphertext (concatenated `IV || ciphertext || GCM tag` blocks)
  * into a plaintext Blob.
  *
- * This is a lower-level utility useful when you already have the raw encrypted
- * bytes — for example, from a custom fetch pipeline or for testing.
+ * This is a lower-level utility for when you already have the complete encrypted
+ * data in memory.  For large files, prefer `downloadFile()` which streams and
+ * decrypts incrementally without buffering the entire ciphertext.
  *
  * @param encryptedBytes  The raw binary ciphertext to decrypt.
  * @param chunkSize       The plaintext chunk size in bytes used during upload.
@@ -139,17 +193,6 @@ export async function downloadFile(
  * @param onProgress      Optional callback invoked after each chunk is decrypted.
  *                         Receives a number between 0 and 1.
  * @returns The assembled plaintext Blob and the original content type.
- *
- * @example
- * ```ts
- * import { decryptBytes } from 'shazoneSDK';
- *
- * const res = await fetch('https://api.sha.zone/v1/f/some-uuid');
- * const encryptedBytes = new Uint8Array(await res.arrayBuffer());
- * const contentType = res.headers.get('x-content-type') || 'application/octet-stream';
- * const chunkSize = parseInt(res.headers.get('x-chunk-size') || '5000000', 10);
- * const { blob } = await decryptBytes(encryptedBytes, chunkSize, rawKey, contentType);
- * ```
  */
 export async function decryptBytes(
 	encryptedBytes: Uint8Array,
@@ -167,7 +210,7 @@ export async function decryptBytes(
 	while (offset < encryptedBytes.length) {
 		const remaining = encryptedBytes.length - offset;
 		const size = Math.min(encryptedChunkSize, remaining);
-		chunks.push(encryptedBytes.slice(offset, offset + size));
+		chunks.push(encryptedBytes.subarray(offset, offset + size));
 		offset += size;
 	}
 
@@ -175,22 +218,14 @@ export async function decryptBytes(
 	const plaintextChunks: Uint8Array[] = [];
 	for (let i = 0; i < chunks.length; i++) {
 		const chunk = chunks[i]!;
-		const iv = chunk.slice(0, IV_LEN);
-		const ciphertext = chunk.slice(IV_LEN);
+		const iv = chunk.subarray(0, IV_LEN);
+		const ciphertext = chunk.subarray(IV_LEN);
 		const plaintext = await decryptChunk(cryptoKey, iv, ciphertext);
 		plaintextChunks.push(plaintext);
 		onProgress?.((i + 1) / chunks.length);
 	}
 
-	// Assemble
-	const totalLen = plaintextChunks.reduce((sum, c) => sum + c.length, 0);
-	const decrypted = new Uint8Array(totalLen);
-	let writeOffset = 0;
-	for (const chunk of plaintextChunks) {
-		decrypted.set(chunk, writeOffset);
-		writeOffset += chunk.length;
-	}
-
-	const blob = new Blob([decrypted], { type: contentType });
+	// Assemble — Blob(chunks) avoids creating a second contiguous copy
+	const blob = new Blob(plaintextChunks as BlobPart[], { type: contentType });
 	return { blob, contentType };
 }
