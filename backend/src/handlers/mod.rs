@@ -2,6 +2,7 @@ mod abort_upload;
 mod complete_upload;
 mod create_upload;
 mod download;
+mod errors;
 mod sign_parts;
 
 pub use abort_upload::*;
