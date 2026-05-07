@@ -17,6 +17,11 @@ pub struct StoredFile {
     /// during upload. Used by the frontend to infer the correct file extension.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content_type: Option<String>,
+    /// Plaintext chunk size in bytes used during upload (e.g. 5_242_880 for 5 MiB).
+    /// Stored as S3 object metadata `"chunk-size"`. If absent (legacy uploads),
+    /// the client falls back to a 5 MiB default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunk_size: Option<u64>,
 }
 
 pub async fn download(
@@ -53,6 +58,12 @@ pub async fn download(
 
     // Extract the original MIME type from object metadata (set during upload).
     let content_type: Option<String> = resp.content_type().map(String::from);
+
+    // Extract the plaintext chunk size stored during upload, if present.
+    let chunk_size: Option<u64> = resp
+        .metadata()
+        .and_then(|m| m.get("chunk-size"))
+        .and_then(|v| v.parse().ok());
 
     let data = match resp.body.collect().await {
         Ok(bytes) => bytes.into_bytes().to_vec(),
@@ -111,6 +122,7 @@ pub async fn download(
         data: data_b64,
         nonce: nonce_b64,
         content_type,
+        chunk_size,
     };
 
     (

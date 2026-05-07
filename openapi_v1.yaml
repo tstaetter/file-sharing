@@ -87,17 +87,27 @@ paths:
                   nullable: true
                   description: The original file's MIME type (e.g. "image/png").
                   example: "image/png"
+                chunk_size:
+                  type: integer
+                  minimum: 1
+                  description: >
+                    Plaintext chunk size in bytes used for client-side encryption.
+                    Must be ≥ 5 MiB (5242880) for multipart uploads. Defaults to
+                    6291456 (6 MiB) if omitted.
+                  example: 6291456
             examples:
               withContentType:
                 summary: Upload with explicit content type
                 value:
                   file_id: "550e8400-e29b-41d4-a716-446655440000"
                   content_type: "application/pdf"
+                  chunk_size: 6291456
               withoutContentType:
                 summary: Upload without content type
                 value:
                   file_id: "550e8400-e29b-41d4-a716-446655440000"
                   content_type: null
+                  chunk_size: 6291456
       responses:
         "200":
           description: Multipart upload successfully created.
@@ -120,6 +130,13 @@ paths:
                       `uploads/`. This key must be passed to sign-parts,
                       complete-upload, and abort-upload calls.
                     example: "uploads/550e8400-e29b-41d4-a716-446655440000"
+                  chunk_size:
+                    type: integer
+                    description: >
+                      Plaintext chunk size in bytes used for client-side encryption.
+                      Reflects the value sent in the request, or the default
+                      6291456 (6 MiB) if omitted.
+                    example: 6291456
         "400":
           description: >
             The request body is malformed or missing the required `file_id` field.
@@ -442,11 +459,13 @@ paths:
                     data: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g..."
                     nonce: "AAAAAAAAAAAAAAAA"
                     content_type: "image/png"
+                    chunk_size: 6291456
                 withoutContentType:
                   summary: File without content type
                   value:
                     data: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g..."
                     nonce: "AAAAAAAAAAAAAAAA"
+                    chunk_size: 6291456
         "404":
           description: >
             File not found. This occurs when:
@@ -482,9 +501,13 @@ components:
           description: >
             The complete encrypted file payload, base64-encoded. The client
             decrypts this by splitting it into per-chunk blocks of
-            `IV (12 bytes) || ciphertext || GCM tag (16 bytes)`. Each 5 MB
-            plaintext chunk produces `12 + 5242880 + 16 = 5252908` bytes
-            in the encrypted stream.
+            `IV (12 bytes) || ciphertext || GCM tag (16 bytes)`. The chunk
+            size used during upload is available in the `chunk_size` field;
+            each plaintext chunk of that size produces
+            `12 + chunk_size + 16` bytes in the encrypted stream.
+            For legacy uploads without a `chunk_size` field, the default
+            chunk size was 5000000 (5 MB), producing
+            `12 + 5000000 + 16 = 5000028` bytes per chunk.
           example: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g..."
         nonce:
           type: string
@@ -505,6 +528,16 @@ components:
             determine the correct file extension when saving the decrypted file
             to disk. Omitted or `null` if no content type was provided during upload.
           example: "application/pdf"
+        chunk_size:
+          type: integer
+          nullable: true
+          description: >
+            Plaintext chunk size in bytes that was used during upload. Used by
+            the client to correctly split the encrypted data into per-chunk
+            blocks for decryption. Each chunk of `chunk_size` plaintext bytes
+            produces `12 + chunk_size + 16` encrypted bytes in the `data` stream.
+            `null` or absent for legacy uploads that used 5000000 (5 MB) chunks.
+          example: 6291456
 
     ErrorResponse:
       type: object

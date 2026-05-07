@@ -1,5 +1,5 @@
 import { generateKey, encryptChunk } from './crypto';
-import { chunkFile } from './chunk';
+import { chunkFile, DEFAULT_CHUNK_SIZE } from './chunk';
 
 /** Returned by `POST /v1/create-upload`. */
 export interface CreateUploadResponse {
@@ -33,7 +33,7 @@ export interface UploadResult {
  * This function:
  * 1. Generates a fresh AES-256-GCM key.
  * 2. Calls `POST /v1/create-upload` to initiate a multipart upload.
- * 3. Splits the file into 5 MB chunks, encrypts each with a random IV, and
+ * 3. Splits the file into 6 MiB chunks, encrypts each with a random IV, and
  *    uploads each one directly to R2 via a presigned URL.
  * 4. Calls `POST /v1/complete-upload` to finalise the upload.
  *
@@ -56,10 +56,7 @@ export interface UploadResult {
  * console.log('Share this link:', url);
  * ```
  */
-export async function uploadFile(
-	apiPrefix: string,
-	file: File,
-): Promise<UploadResult> {
+export async function uploadFile(apiPrefix: string, file: File): Promise<UploadResult> {
 	const { key, raw } = await generateKey();
 	const fileId = crypto.randomUUID();
 
@@ -69,22 +66,20 @@ export async function uploadFile(
 		body: JSON.stringify({
 			file_id: fileId,
 			content_type: file.type || null,
-		}),
+			chunk_size: DEFAULT_CHUNK_SIZE
+		})
 	});
 
 	if (!init.ok) {
-		throw new Error(
-			`create-upload failed: ${init.status} ${init.statusText}`,
-		);
+		throw new Error(`create-upload failed: ${init.status} ${init.statusText}`);
 	}
 
-	const { upload_id, key: storageKey } =
-		(await init.json()) as CreateUploadResponse;
+	const { upload_id, key: storageKey } = (await init.json()) as CreateUploadResponse;
 
 	let part = 1;
 	const parts: PartETag[] = [];
 
-	for await (const chunk of chunkFile(file)) {
+	for await (const chunk of chunkFile(file, DEFAULT_CHUNK_SIZE)) {
 		const { iv, data } = await encryptChunk(key, chunk);
 
 		const payload = new Uint8Array(iv.length + data.length);
@@ -97,8 +92,8 @@ export async function uploadFile(
 			body: JSON.stringify({
 				key: storageKey,
 				upload_id,
-				part_numbers: [part],
-			}),
+				part_numbers: [part]
+			})
 		});
 
 		if (!signRes.ok) {
@@ -106,10 +101,10 @@ export async function uploadFile(
 			await fetch(`${apiPrefix}/abort-upload`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ key: storageKey, upload_id }),
+				body: JSON.stringify({ key: storageKey, upload_id })
 			});
 			throw new Error(
-				`sign-parts failed for part ${part}: ${signRes.status} ${signRes.statusText}`,
+				`sign-parts failed for part ${part}: ${signRes.status} ${signRes.statusText}`
 			);
 		}
 
@@ -119,30 +114,28 @@ export async function uploadFile(
 			await fetch(`${apiPrefix}/abort-upload`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ key: storageKey, upload_id }),
+				body: JSON.stringify({ key: storageKey, upload_id })
 			});
 			throw new Error(`sign-parts returned no URL for part ${part}`);
 		}
 
 		const uploadRes = await fetch(url, {
 			method: 'PUT',
-			body: payload,
+			body: payload
 		});
 
 		if (!uploadRes.ok) {
 			await fetch(`${apiPrefix}/abort-upload`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ key: storageKey, upload_id }),
+				body: JSON.stringify({ key: storageKey, upload_id })
 			});
-			throw new Error(
-				`part ${part} upload failed: ${uploadRes.status} ${uploadRes.statusText}`,
-			);
+			throw new Error(`part ${part} upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
 		}
 
 		parts.push({
 			part_number: part,
-			etag: uploadRes.headers.get('ETag'),
+			etag: uploadRes.headers.get('ETag')
 		});
 
 		part++;
@@ -154,19 +147,17 @@ export async function uploadFile(
 		body: JSON.stringify({
 			key: storageKey,
 			upload_id,
-			parts,
-		}),
+			parts
+		})
 	});
 
 	if (!completeRes.ok) {
 		await fetch(`${apiPrefix}/abort-upload`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ key: storageKey, upload_id }),
+			body: JSON.stringify({ key: storageKey, upload_id })
 		});
-		throw new Error(
-			`complete-upload failed: ${completeRes.status} ${completeRes.statusText}`,
-		);
+		throw new Error(`complete-upload failed: ${completeRes.status} ${completeRes.statusText}`);
 	}
 
 	return { raw, fileId };

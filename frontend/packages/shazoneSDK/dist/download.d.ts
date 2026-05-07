@@ -9,6 +9,8 @@ export interface StoredFile {
     nonce: string;
     /** The original file's MIME type, if one was provided during upload. */
     content_type?: string | null;
+    /** The plaintext chunk size in bytes used during upload, if provided by the server. */
+    chunk_size?: number | null;
 }
 /** The result of a successful download and decryption. */
 export interface DownloadResult {

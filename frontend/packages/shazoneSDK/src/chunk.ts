@@ -5,7 +5,7 @@
  * read and process each chunk without loading the entire file into memory.
  *
  * @param file The file or blob to split. If `undefined` or `null`, yields nothing.
- * @param size Maximum chunk size in bytes (default 5 MB).
+ * @param size Maximum chunk size in bytes (default 6 MiB).
  *
  * @example
  * ```ts
@@ -18,9 +18,13 @@
  * }
  * ```
  */
+
+/** Default chunk size: 6 MiB (6 * 1024 * 1024 = 6,291,456 bytes). */
+export const DEFAULT_CHUNK_SIZE = 6 * 1024 * 1024; // 6 MiB
+
 export async function* chunkFile(
 	file: File | Blob | undefined,
-	size = 5_000_000,
+	size = DEFAULT_CHUNK_SIZE
 ): AsyncGenerator<Uint8Array, void, undefined> {
 	if (!file) return;
 

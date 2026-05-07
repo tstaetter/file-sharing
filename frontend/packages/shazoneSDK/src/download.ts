@@ -3,10 +3,9 @@ import { importKey, decryptChunk } from './crypto';
 
 // Sizes are deliberately hardcoded to match the Rust upload backend and the
 // per-chunk encryption scheme. Changing these will break interop.
-const CHUNK_SIZE = 5_000_000;
+const LEGACY_CHUNK_SIZE = 5_000_000;
 const IV_LEN = 12;
 const GCM_TAG_LEN = 16;
-const ENCRYPTED_CHUNK_SIZE = IV_LEN + CHUNK_SIZE + GCM_TAG_LEN;
 
 /** The JSON shape returned by `GET /v1/f/{id}`. */
 export interface StoredFile {
@@ -19,6 +18,8 @@ export interface StoredFile {
 	nonce: string;
 	/** The original file's MIME type, if one was provided during upload. */
 	content_type?: string | null;
+	/** The plaintext chunk size in bytes used during upload, if provided by the server. */
+	chunk_size?: number | null;
 }
 
 /** The result of a successful download and decryption. */
@@ -113,12 +114,17 @@ export async function decryptFile(
 	const cryptoKey = await importKey(rawKey);
 	const encryptedBytes = dataToBytes(stored.data);
 
+	// Determine the chunk size used during upload.  Older uploads that
+	// don't include `chunk_size` used a 5 MB plaintext chunk size.
+	const chunkSize = stored.chunk_size ?? LEGACY_CHUNK_SIZE;
+	const encryptedChunkSize = IV_LEN + chunkSize + GCM_TAG_LEN;
+
 	// --- split into per-chunk blocks ---
 	const chunks: Uint8Array[] = [];
 	let offset = 0;
 	while (offset < encryptedBytes.length) {
 		const remaining = encryptedBytes.length - offset;
-		const size = Math.min(ENCRYPTED_CHUNK_SIZE, remaining);
+		const size = Math.min(encryptedChunkSize, remaining);
 		chunks.push(encryptedBytes.slice(offset, offset + size));
 		offset += size;
 	}

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct CreateRequest {
     file_id: String,
     content_type: Option<String>,
+    chunk_size: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -28,6 +29,10 @@ pub async fn create_upload(
 
     if let Some(ct) = req.content_type {
         builder = builder.content_type(ct);
+    }
+
+    if let Some(cs) = req.chunk_size {
+        builder = builder.metadata("chunk-size", cs.to_string());
     }
 
     let resp = builder.send().await.unwrap();

@@ -26,7 +26,7 @@ export interface UploadResult {
  * This function:
  * 1. Generates a fresh AES-256-GCM key.
  * 2. Calls `POST /v1/create-upload` to initiate a multipart upload.
- * 3. Splits the file into 5 MB chunks, encrypts each with a random IV, and
+ * 3. Splits the file into 6 MiB chunks, encrypts each with a random IV, and
  *    uploads each one directly to R2 via a presigned URL.
  * 4. Calls `POST /v1/complete-upload` to finalise the upload.
  *

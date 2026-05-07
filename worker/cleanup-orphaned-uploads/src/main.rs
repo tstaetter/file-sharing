@@ -1,13 +1,13 @@
 use aws_config::{BehaviorVersion, Region};
-use aws_sdk_s3::config::Credentials;
 use aws_sdk_s3::Client;
+use aws_sdk_s3::config::Credentials;
 use aws_smithy_types_convert::date_time::DateTimeExt;
 use chrono::{Duration, Utc};
 use cleanup_orphaned_uploads::{CleanupError, CleanupResult};
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{StreamExt, stream::FuturesUnordered};
 use std::env;
 use tracing::info;
-use tracing_subscriber::{prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, prelude::*};
 
 const MAX_CONCURRENT: usize = 10;
 

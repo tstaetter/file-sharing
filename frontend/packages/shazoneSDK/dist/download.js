@@ -2,10 +2,9 @@ import { dataToBytes, extensionFromMime } from './utils';
 import { importKey, decryptChunk } from './crypto';
 // Sizes are deliberately hardcoded to match the Rust upload backend and the
 // per-chunk encryption scheme. Changing these will break interop.
-const CHUNK_SIZE = 5_000_000;
+const LEGACY_CHUNK_SIZE = 5_000_000;
 const IV_LEN = 12;
 const GCM_TAG_LEN = 16;
-const ENCRYPTED_CHUNK_SIZE = IV_LEN + CHUNK_SIZE + GCM_TAG_LEN;
 /**
  * Downloads and decrypts a file from the file-sharing backend.
  *
@@ -73,12 +72,16 @@ export async function downloadFile(apiPrefix, fileId, rawKey) {
 export async function decryptFile(stored, rawKey) {
     const cryptoKey = await importKey(rawKey);
     const encryptedBytes = dataToBytes(stored.data);
+    // Determine the chunk size used during upload.  Older uploads that
+    // don't include `chunk_size` used a 5 MB plaintext chunk size.
+    const chunkSize = stored.chunk_size ?? LEGACY_CHUNK_SIZE;
+    const encryptedChunkSize = IV_LEN + chunkSize + GCM_TAG_LEN;
     // --- split into per-chunk blocks ---
     const chunks = [];
     let offset = 0;
     while (offset < encryptedBytes.length) {
         const remaining = encryptedBytes.length - offset;
-        const size = Math.min(ENCRYPTED_CHUNK_SIZE, remaining);
+        const size = Math.min(encryptedChunkSize, remaining);
         chunks.push(encryptedBytes.slice(offset, offset + size));
         offset += size;
     }
