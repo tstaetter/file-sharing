@@ -53,6 +53,8 @@ async fn main() {
         .expose_headers("ETag")
         .expose_headers("x-amz-request-id")
         .expose_headers("x-amz-id-2")
+        .expose_headers("x-chunk-size")
+        .expose_headers("x-content-type")
         .max_age_seconds(3600)
         .build()
         .expect("failed to build CORS rule");

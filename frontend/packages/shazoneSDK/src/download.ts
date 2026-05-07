@@ -1,28 +1,12 @@
-import { dataToBytes, extensionFromMime } from './utils';
+import { extensionFromMime } from './utils';
 import { importKey, decryptChunk } from './crypto';
+import type { ProgressCallback } from './upload';
 
 // Sizes are deliberately hardcoded to match the Rust upload backend and the
 // per-chunk encryption scheme. Changing these will break interop.
 const LEGACY_CHUNK_SIZE = 5_000_000;
 const IV_LEN = 12;
 const GCM_TAG_LEN = 16;
-
-/** The JSON shape returned by `GET /v1/f/{id}`. */
-export interface StoredFile {
-	/** Base64-encoded ciphertext (concatenated per-chunk `IV || ciphertext` blocks). */
-	data: string;
-	/**
-	 * Base64-encoded dummy nonce. Kept for backwards compatibility; the actual
-	 * AES-GCM IVs are embedded at the start of each chunk inside `data`.
-	 */
-	nonce: string;
-	/** The original file's MIME type, if one was provided during upload. */
-	content_type?: string | null;
-	/** The plaintext chunk size in bytes used during upload, if provided by the server. */
-	chunk_size?: number | null;
-}
-
-import type { ProgressCallback } from './upload';
 
 /** The result of a successful download and decryption. */
 export interface DownloadResult {
@@ -38,11 +22,14 @@ export interface DownloadResult {
 /**
  * Downloads and decrypts a file from the file-sharing backend.
  *
- * This function:
- * 1. Fetches the encrypted blob from `GET /v1/f/{id}`.
- * 2. Splits the base64-encoded data into per-chunk `IV || ciphertext+tag` blocks.
- * 3. Decrypts each chunk with the provided AES key.
- * 4. Assembles the plaintext chunks into a Blob.
+ * The backend now returns raw binary ciphertext with metadata in response
+ * headers, rather than a JSON payload. This function:
+ * 1. Fetches the encrypted binary stream from `GET /v1/f/{id}`.
+ * 2. Reads `X-Content-Type` and `X-Chunk-Size` from response headers.
+ * 3. Downloads the binary body, tracking byte-level progress when
+ *    `Content-Length` is available.
+ * 4. Decrypts the binary data (concatenated `IV || ciphertext || GCM tag` blocks).
+ * 5. Assembles the plaintext chunks into a Blob.
  *
  * The backend deletes the file from R2 **immediately after serving it**
  * ("burn after reading"), so a file can only be downloaded once.
@@ -74,87 +61,107 @@ export async function downloadFile(
 	rawKey: Uint8Array,
 	onProgress?: ProgressCallback
 ): Promise<DownloadResult> {
+	// Milestone-based progress:
+	//   0.00 — started
+	//   0.05 — response headers received
+	//   0.05–0.85 — binary data downloaded (byte-level if Content-Length available)
+	//   0.85–0.95 — decrypting chunks
+	//   0.95 — assembling result
+	//   1.00 — done
 	onProgress?.(0);
 
 	const res = await fetch(`${apiPrefix}/f/${fileId}`);
-
 	if (!res.ok) {
 		throw new Error(`failed to fetch file: ${res.status} ${res.statusText}`);
 	}
+	onProgress?.(0.05);
 
-	// Track download progress via the readable stream if Content-Length is available.
-	const contentLength = res.headers.get('Content-Length');
-	let body: StoredFile;
+	// Read metadata from response headers
+	const contentType = res.headers.get('x-content-type') || 'application/octet-stream';
+	const chunkSizeHeader = res.headers.get('x-chunk-size');
+	const chunkSize = chunkSizeHeader ? parseInt(chunkSizeHeader, 10) : LEGACY_CHUNK_SIZE;
 
-	if (contentLength && res.body) {
-		const total = parseInt(contentLength, 10);
+	// Download the encrypted binary data with progress tracking
+	const contentLength = parseInt(res.headers.get('Content-Length') || '0', 10);
+	let encryptedBytes: Uint8Array;
+
+	if (contentLength > 0 && res.body) {
+		// Stream with byte-level progress tracking (5%–85%)
 		const reader = res.body.getReader();
 		const chunks: Uint8Array[] = [];
 		let downloaded = 0;
-
 		while (true) {
 			const { done, value } = await reader.read();
 			if (done) break;
 			chunks.push(value);
 			downloaded += value.length;
-			// Download phase accounts for the first 50% of progress
-			onProgress?.(0.5 * (downloaded / total));
+			onProgress?.(0.05 + 0.8 * (downloaded / contentLength));
 		}
-
-		const decoder = new TextDecoder();
-		body = JSON.parse(
-			chunks.map((c) => decoder.decode(c, { stream: true })).join('') + decoder.decode()
-		);
+		// Combine chunks into a single Uint8Array
+		encryptedBytes = new Uint8Array(downloaded);
+		let offset = 0;
+		for (const chunk of chunks) {
+			encryptedBytes.set(chunk, offset);
+			offset += chunk.length;
+		}
 	} else {
-		body = await res.json();
+		// No Content-Length, download all at once
+		const buffer = await res.arrayBuffer();
+		encryptedBytes = new Uint8Array(buffer);
 	}
+	onProgress?.(0.85);
 
-	// Decrypt phase accounts for the remaining 50%
-	const { blob, contentType } = await decryptFile(body, rawKey, (p) => onProgress?.(0.5 + 0.5 * p));
+	// Decrypt phase: 85%–95%
+	const { blob } = await decryptBytes(encryptedBytes, chunkSize, rawKey, contentType, (p) =>
+		onProgress?.(0.85 + 0.1 * p)
+	);
+
+	onProgress?.(0.95);
 
 	const ext = extensionFromMime(contentType);
 	const fileName = `download.${ext}`;
 
+	onProgress?.(1);
 	return { blob, fileName };
 }
 
 /**
- * Decrypts an already-fetched `StoredFile` payload into a Blob.
+ * Decrypts raw binary ciphertext (concatenated `IV || ciphertext || GCM tag` blocks)
+ * into a plaintext Blob.
  *
- * This is a lower-level function useful when you already have the JSON
- * response in memory. It splits the `data` byte stream into per-chunk
- * `IV (12 bytes) || ciphertext || GCM tag (16 bytes)` blocks and
- * decrypts each one independently.
+ * This is a lower-level utility useful when you already have the raw encrypted
+ * bytes — for example, from a custom fetch pipeline or for testing.
  *
- * @param stored    The JSON payload returned by `GET /v1/f/{id}`.
- * @param rawKey    The raw AES-256 key bytes.
- * @param onProgress Optional callback invoked after each chunk is decrypted.
- *                    Receives a number between 0 and 1.
+ * @param encryptedBytes  The raw binary ciphertext to decrypt.
+ * @param chunkSize       The plaintext chunk size in bytes used during upload.
+ * @param rawKey          The raw AES-256 key bytes.
+ * @param contentType     The MIME type to assign to the resulting Blob.
+ * @param onProgress      Optional callback invoked after each chunk is decrypted.
+ *                         Receives a number between 0 and 1.
  * @returns The assembled plaintext Blob and the original content type.
  *
  * @example
  * ```ts
- * import { decryptFile } from 'shazoneSDK';
+ * import { decryptBytes } from 'shazoneSDK';
  *
- * const response = await fetch('https://api.sha.zone/v1/f/some-uuid');
- * const stored = await response.json();
- * const { blob } = await decryptFile(stored, rawKey);
+ * const res = await fetch('https://api.sha.zone/v1/f/some-uuid');
+ * const encryptedBytes = new Uint8Array(await res.arrayBuffer());
+ * const contentType = res.headers.get('x-content-type') || 'application/octet-stream';
+ * const chunkSize = parseInt(res.headers.get('x-chunk-size') || '5000000', 10);
+ * const { blob } = await decryptBytes(encryptedBytes, chunkSize, rawKey, contentType);
  * ```
  */
-export async function decryptFile(
-	stored: StoredFile,
+export async function decryptBytes(
+	encryptedBytes: Uint8Array,
+	chunkSize: number,
 	rawKey: Uint8Array,
+	contentType: string,
 	onProgress?: ProgressCallback
 ): Promise<{ blob: Blob; contentType: string }> {
 	const cryptoKey = await importKey(rawKey);
-	const encryptedBytes = dataToBytes(stored.data);
-
-	// Determine the chunk size used during upload.  Older uploads that
-	// don't include `chunk_size` used a 5 MB plaintext chunk size.
-	const chunkSize = stored.chunk_size ?? LEGACY_CHUNK_SIZE;
 	const encryptedChunkSize = IV_LEN + chunkSize + GCM_TAG_LEN;
 
-	// --- split into per-chunk blocks ---
+	// Split into encrypted chunks
 	const chunks: Uint8Array[] = [];
 	let offset = 0;
 	while (offset < encryptedBytes.length) {
@@ -164,7 +171,7 @@ export async function decryptFile(
 		offset += size;
 	}
 
-	// --- decrypt each chunk ---
+	// Decrypt each chunk
 	const plaintextChunks: Uint8Array[] = [];
 	for (let i = 0; i < chunks.length; i++) {
 		const chunk = chunks[i]!;
@@ -175,7 +182,7 @@ export async function decryptFile(
 		onProgress?.((i + 1) / chunks.length);
 	}
 
-	// --- reassemble ---
+	// Assemble
 	const totalLen = plaintextChunks.reduce((sum, c) => sum + c.length, 0);
 	const decrypted = new Uint8Array(totalLen);
 	let writeOffset = 0;
@@ -184,8 +191,6 @@ export async function decryptFile(
 		writeOffset += chunk.length;
 	}
 
-	const contentType = stored.content_type || 'application/octet-stream';
 	const blob = new Blob([decrypted], { type: contentType });
-
 	return { blob, contentType };
 }

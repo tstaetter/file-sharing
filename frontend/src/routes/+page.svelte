@@ -151,13 +151,19 @@
 		{#if uploading}
 			<div class="mt-5">
 				<div class="flex items-center justify-between mb-1.5">
-					<span class="text-xs text-violet-600 font-medium">Encrypting &amp; uploading…</span>
-					<span class="text-xs text-violet-500">{(progress * 100).toFixed(0)}%</span>
+					<span class="text-xs text-violet-600 font-medium">
+						{progress < 0.05
+							? 'Preparing…'
+							: progress < 1
+								? 'Encrypting &amp; uploading…'
+								: 'Completing…'}
+					</span>
+					<span class="text-xs text-violet-500">{Math.min(progress * 100, 100).toFixed(0)}%</span>
 				</div>
 				<div class="w-full h-2 bg-violet-100 rounded-full overflow-hidden">
 					<div
 						class="h-full bg-gradient-to-r from-violet-500 to-violet-600 rounded-full transition-all duration-300 ease-out"
-						style="width: {progress * 100}%"
+						style="width: {Math.max(progress * 100, 2)}%"
 					></div>
 				</div>
 			</div>

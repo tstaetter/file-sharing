@@ -6,7 +6,7 @@ export {
 	decryptChunk,
 	chunkFile,
 	downloadFile,
-	decryptFile,
+	decryptBytes,
 	createCapabilityUrl,
 	urlSafeBase64,
 	base64ToBytes,
@@ -19,7 +19,6 @@ export type {
 	SignedUrl,
 	PartETag,
 	UploadResult,
-	StoredFile,
 	DownloadResult,
 	ProgressCallback
 } from '../../packages/shazoneSDK';

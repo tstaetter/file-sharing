@@ -381,11 +381,11 @@ paths:
         Downloads the encrypted file by its UUID. This endpoint implements
         **"burn after reading"** semantics:
 
-        1. Fetch the encrypted object from R2.
-        2. Read the entire body into memory.
-        3. **Immediately delete the object from R2.**
-        4. Return the binary data (base64-encoded), a dummy nonce, and the
-           stored MIME type as JSON.
+        1. Fetch the object stream from R2 via `get_object()`.
+        2. **Immediately delete the object from R2.** The data is already in
+           transit from R2, so the stream continues to work even after deletion.
+        3. Stream the raw binary ciphertext directly to the client — no buffering,
+           no base64 encoding, no JSON wrapper.
 
         A file can be downloaded **exactly once**. Any subsequent request
         for the same `id` will return a 404 Not Found.
@@ -396,15 +396,18 @@ paths:
 
         ## Response Format
 
-        - `data`: The entire encrypted file payload, base64-encoded. The client
-          splits this into per-chunk `IV (12 bytes) || ciphertext || GCM tag (16 bytes)`
-          blocks for decryption. Each chunk is `ENCRYPTED_CHUNK_SIZE = IV_LEN + CHUNK_SIZE + GCM_TAG_LEN`.
-        - `nonce`: A base64-encoded zero-filled 12-byte array. This field is kept
-          for backwards compatibility; the actual IVs are embedded in the `data`
-          stream per chunk.
-        - `content_type`: The original file's MIME type (stored as S3 object metadata
-          during upload), if one was provided. The frontend uses this to infer the
-          correct file extension when triggering the browser download.
+        The response body is the **raw binary ciphertext** — a stream of
+        concatenated `IV (12 bytes) || ciphertext || GCM tag (16 bytes)` blocks.
+        Metadata is sent in response headers instead of a JSON payload:
+
+        - `Content-Type`: Always `application/octet-stream`.
+        - `X-Content-Type`: The original file's MIME type (from S3 object metadata).
+          Used by the client to determine the correct file extension. Defaults to
+          `application/octet-stream` if no content type was stored.
+        - `X-Chunk-Size`: Plaintext chunk size in bytes (from S3 object `chunk-size`
+          metadata). Used by the client to split the encrypted stream into
+          per-chunk blocks for decryption. If absent, the client falls back to
+          5,000,000 (5 MB) for legacy uploads.
 
         ## Security
 
@@ -429,8 +432,33 @@ paths:
         "200":
           description: >
             File successfully retrieved from R2 and deleted ("burned"). The
-            encrypted body is returned as base64-encoded JSON.
+            encrypted body is returned as a raw binary stream of concatenated
+            `IV (12 bytes) || ciphertext || GCM tag (16 bytes)` blocks.
           headers:
+            Content-Type:
+              description: Always `application/octet-stream` for the binary ciphertext stream.
+              schema:
+                type: string
+                example: "application/octet-stream"
+            X-Content-Type:
+              description: >
+                The original file's MIME type (e.g. "image/png"), stored as S3
+                object metadata during upload. Used by the client to determine
+                the correct file extension after decryption. Defaults to
+                `application/octet-stream` if no content type was stored.
+              schema:
+                type: string
+                example: "image/png"
+            X-Chunk-Size:
+              description: >
+                Plaintext chunk size in bytes that was used during upload
+                (e.g. 6291456 for 6 MiB). Used by the client to correctly
+                split the encrypted stream into per-chunk blocks for decryption.
+                If absent, the client falls back to 5000000 (5 MB) for legacy
+                uploads.
+              schema:
+                type: integer
+                example: 6291456
             Cache-Control:
               description: Prevents caching at all levels.
               schema:
@@ -447,25 +475,15 @@ paths:
                 type: string
                 example: "0"
           content:
-            application/json:
+            application/octet-stream:
               schema:
-                allOf:
-                  - $ref: "#/components/schemas/StoredFile"
-                  - description: The encrypted file payload.
-              examples:
-                withContentType:
-                  summary: File with known content type
-                  value:
-                    data: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g..."
-                    nonce: "AAAAAAAAAAAAAAAA"
-                    content_type: "image/png"
-                    chunk_size: 6291456
-                withoutContentType:
-                  summary: File without content type
-                  value:
-                    data: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g..."
-                    nonce: "AAAAAAAAAAAAAAAA"
-                    chunk_size: 6291456
+                type: string
+                format: binary
+                description: >
+                  Raw binary ciphertext — a stream of concatenated
+                  `IV (12 bytes) || ciphertext || GCM tag (16 bytes)` blocks.
+                  The client splits this into per-chunk blocks of
+                  `12 + chunk_size + 16` bytes each for decryption.
         "404":
           description: >
             File not found. This occurs when:
@@ -478,67 +496,17 @@ paths:
               example: "file not found"
         "500":
           description: >
-            Internal server error. This occurs when the R2 SDK fails to read the
-            object body after a successful `get_object` call. The object may or may
-            not have been deleted depending on when the error occurred.
+            Internal server error. This occurs when the backend fails to stream
+            the object body from R2 after a successful `get_object` call, or when
+            the `get_object` call itself fails with an unexpected error.
           content:
             text/plain:
               schema:
                 type: string
-              example: "failed to read file"
+              example: "failed to fetch object from R2"
 
 components:
   schemas:
-    StoredFile:
-      type: object
-      required:
-        - data
-        - nonce
-      properties:
-        data:
-          type: string
-          format: byte
-          description: >
-            The complete encrypted file payload, base64-encoded. The client
-            decrypts this by splitting it into per-chunk blocks of
-            `IV (12 bytes) || ciphertext || GCM tag (16 bytes)`. The chunk
-            size used during upload is available in the `chunk_size` field;
-            each plaintext chunk of that size produces
-            `12 + chunk_size + 16` bytes in the encrypted stream.
-            For legacy uploads without a `chunk_size` field, the default
-            chunk size was 5000000 (5 MB), producing
-            `12 + 5000000 + 16 = 5000028` bytes per chunk.
-          example: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g..."
-        nonce:
-          type: string
-          format: byte
-          description: >
-            Base64-encoded zero-filled 12-byte array. This field is kept for
-            backwards compatibility with older clients. The actual AES-GCM
-            nonces (IVs) are embedded at the start of each chunk in the `data`
-            stream. New clients should ignore this field and use the per-chunk
-            IVs from `data`.
-          example: "AAAAAAAAAAAAAAAA"
-        content_type:
-          type: string
-          nullable: true
-          description: >
-            The original file's MIME type (e.g. "image/png", "application/pdf"),
-            as set during `POST /v1/create-upload`. Used by the frontend to
-            determine the correct file extension when saving the decrypted file
-            to disk. Omitted or `null` if no content type was provided during upload.
-          example: "application/pdf"
-        chunk_size:
-          type: integer
-          nullable: true
-          description: >
-            Plaintext chunk size in bytes that was used during upload. Used by
-            the client to correctly split the encrypted data into per-chunk
-            blocks for decryption. Each chunk of `chunk_size` plaintext bytes
-            produces `12 + chunk_size + 16` encrypted bytes in the `data` stream.
-            `null` or absent for legacy uploads that used 5000000 (5 MB) chunks.
-          example: 6291456
-
     ErrorResponse:
       type: object
       properties:

@@ -65,13 +65,21 @@
 		{#if loading}
 			<div class="py-8">
 				<div class="flex items-center justify-between mb-2">
-					<span class="text-sm text-cyan-600 font-medium">Fetching &amp; decrypting…</span>
-					<span class="text-sm text-cyan-500">{(progress * 100).toFixed(0)}%</span>
+					<span class="text-sm text-cyan-600 font-medium">
+						{progress < 0.05
+							? 'Connecting…'
+							: progress < 0.1
+								? 'Fetching…'
+								: progress < 0.95
+									? 'Decrypting…'
+									: 'Preparing file…'}
+					</span>
+					<span class="text-sm text-cyan-500">{Math.min(progress * 100, 100).toFixed(0)}%</span>
 				</div>
 				<div class="w-full h-2.5 bg-cyan-100 rounded-full overflow-hidden">
 					<div
 						class="h-full bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-full transition-all duration-300 ease-out"
-						style="width: {progress * 100}%"
+						style="width: {Math.max(progress * 100, 2)}%"
 					></div>
 				</div>
 			</div>

@@ -109,7 +109,7 @@ All endpoints are served under `http://localhost:8000/` and accept/return JSON u
 | POST   | `/v1/sign-parts`      | Generate presigned URLs for a list of part numbers (valid for 1 hour).  | `SignPartsRequest`  | `Vec<SignedPart>`      |
 | POST   | `/v1/complete-upload` | Finalise the multipart upload with the ETags from the client's PUTs.    | `CompleteRequest`   | (empty 200)            |
 | POST   | `/v1/abort-upload`    | Abort an in-progress multipart upload and discard all uploaded parts.   | `AbortRequest`      | (empty 200)            |
-| GET    | `/v1/f/:id`           | Download the encrypted blob. **Deletes the object from R2 after read.** | —                    | `StoredFile` (JSON)    |
+| GET    | `/v1/f/:id`           | Download the encrypted blob. **Deletes the object from R2 after read.** | —                    | Binary stream (see below) |
 
 Refer to the handler source files for the exact struct definitions. All request/response types derive `serde::Serialize` and/or `serde::Deserialize`.
 
@@ -119,12 +119,20 @@ Refer to the handler source files for the exact struct definitions. All request/
 
 The `GET /v1/f/{id}` handler:
 
-1. Fetches the object from R2.
-2. Reads the entire body into memory.
-3. **Immediately deletes the object from R2.**
-4. Returns the binary data (base64-encoded), a dummy nonce, and the stored MIME type as JSON.
+1. Fetches the object stream from R2 via `get_object()`.
+2. **Immediately deletes the object from R2.** The data is already in transit from R2, so the stream continues to work even after deletion.
+3. Streams the raw binary ciphertext directly to the client (no buffering, no base64 encoding, no JSON wrapper).
 
-A file can be downloaded **exactly once** — any subsequent request will return 404. The `nonce` field is kept for backwards compatibility but is always a base64-encoded zero-filled 12-byte array because the per-chunk encryption scheme embeds its own IVs in the data stream.
+The response body is the raw binary ciphertext — concatenated `IV (12 bytes) || ciphertext || GCM tag (16 bytes)` blocks. Metadata is sent in response headers instead of a JSON payload:
+
+| Header            | Description                                                  | Example          |
+|-------------------|--------------------------------------------------------------|------------------|
+| `Content-Type`    | Always `application/octet-stream`                            | `application/octet-stream` |
+| `X-Content-Type`  | The original file's MIME type (from S3 object metadata)      | `image/png`      |
+| `X-Chunk-Size`    | Plaintext chunk size in bytes (from S3 object `chunk-size` metadata) | `6291456`        |
+| `Cache-Control`   | `no-store, no-cache, must-revalidate`                        | —                |
+
+A file can be downloaded **exactly once** — any subsequent request will return 404. If the `X-Chunk-Size` header is absent (legacy uploads), the client falls back to a 5 MiB default.
 
 ### Multipart upload flow
 

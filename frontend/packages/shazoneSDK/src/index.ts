@@ -15,8 +15,8 @@ export type {
 } from './upload';
 
 // ── Download & decryption ───────────────────────────────────────────
-export { downloadFile, decryptFile } from './download';
-export type { StoredFile, DownloadResult } from './download';
+export { downloadFile, decryptBytes } from './download';
+export type { DownloadResult } from './download';
 
 // ── Capability URLs ─────────────────────────────────────────────────
 export { createCapabilityUrl } from './cap_url';

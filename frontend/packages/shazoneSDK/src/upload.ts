@@ -66,6 +66,11 @@ export async function uploadFile(
 	file: File,
 	onProgress?: ProgressCallback
 ): Promise<UploadResult> {
+	// Milestone-based progress:
+	//   0.05 — key generated, upload initiated
+	//   0.05–0.95 — chunks uploaded (proportional to chunk count)
+	//   1.00 — complete-upload finished
+	onProgress?.(0.05);
 	const { key, raw } = await generateKey();
 	const fileId = crypto.randomUUID();
 	const totalChunks = Math.max(1, Math.ceil(file.size / DEFAULT_CHUNK_SIZE));
@@ -148,7 +153,7 @@ export async function uploadFile(
 			etag: uploadRes.headers.get('ETag')
 		});
 
-		onProgress?.(part / totalChunks);
+		onProgress?.(0.05 + 0.9 * (part / totalChunks));
 		part++;
 	}
 
@@ -171,5 +176,6 @@ export async function uploadFile(
 		throw new Error(`complete-upload failed: ${completeRes.status} ${completeRes.statusText}`);
 	}
 
+	onProgress?.(1);
 	return { raw, fileId };
 }

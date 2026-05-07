@@ -78,9 +78,11 @@ Browser                              Backend                         R2
   │                                    │   get_object ───────────────►│
   │                                    │◄─────── encrypted blob ──────│
   │                                    │   delete_object ────────────►│
-  │◄────── { data, nonce, content_type } ─────────────────────────────│
+  │◄──── binary stream ───────────────────────────────────────────  │
+  │     Headers: X-Content-Type, X-Chunk-Size                       │
   │                                    │                              │
-  │  3. Import key, decrypt chunks     │                              │
+  │  3. Read headers, import key       │                              │
+  │     Decrypt each chunk             │                              │
   │                                    │                              │
   │  4. Assemble plaintext Blob        │                              │
   │     Trigger browser download       │                              │

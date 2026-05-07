@@ -5,7 +5,7 @@ export { chunkFile, DEFAULT_CHUNK_SIZE } from './chunk';
 // ── Upload ──────────────────────────────────────────────────────────
 export { uploadFile } from './upload';
 // ── Download & decryption ───────────────────────────────────────────
-export { downloadFile, decryptFile } from './download';
+export { downloadFile, decryptBytes } from './download';
 // ── Capability URLs ─────────────────────────────────────────────────
 export { createCapabilityUrl } from './cap_url';
 // ── Utilities ───────────────────────────────────────────────────────
