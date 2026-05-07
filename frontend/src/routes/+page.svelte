@@ -2,6 +2,7 @@
 	import { uploadFile } from '$lib/upload';
 	import { createCapabilityUrl } from '$lib';
 	import { PUBLIC_PREFIX } from '$env/static/public';
+	import logo from '$lib/assets/logo.webp';
 
 	let file = $state<File | undefined>(undefined);
 	let link = $state('');
@@ -74,24 +75,9 @@
 <div class="w-full max-w-lg">
 	<!-- Card -->
 	<div class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-8">
-		<!-- Icon -->
-		<div
-			class="mx-auto w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mb-6 shadow-md shadow-blue-200/50"
-		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="w-7 h-7 text-white"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
-				stroke-width="2"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-				/>
-			</svg>
+		<!-- Logo -->
+		<div class="mx-auto w-14 h-14 rounded-xl overflow-hidden mb-6 shadow-md shadow-violet-200/50">
+			<img src={logo} alt="sha.zone" class="w-full h-full object-cover" />
 		</div>
 
 		<!-- Title -->
@@ -104,14 +90,14 @@
 		<label
 			class="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200
 					{file
-				? 'border-blue-300 bg-blue-50/50'
+				? 'border-violet-300 bg-violet-50/50'
 				: 'border-slate-200 bg-slate-50/50 hover:border-slate-300 hover:bg-slate-100/50'}"
 		>
 			<div class="flex flex-col items-center gap-2">
 				{#if fileName}
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="w-8 h-8 text-blue-500"
+						class="w-8 h-8 text-violet-500"
 						fill="none"
 						viewBox="0 0 24 24"
 						stroke="currentColor"
@@ -149,12 +135,12 @@
 			disabled={!file || uploading}
 			class="mt-5 w-full py-3 rounded-xl font-medium text-sm transition-all duration-200
 					{file && !uploading
-				? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md shadow-blue-200/50 hover:from-blue-600 hover:to-blue-700 hover:shadow-lg active:scale-[0.98]'
+				? 'bg-gradient-to-r from-violet-500 to-violet-600 text-white shadow-md shadow-violet-200/50 hover:from-violet-600 hover:to-violet-700 hover:shadow-lg active:scale-[0.98]'
 				: 'bg-slate-100 text-slate-400 cursor-not-allowed'}"
 		>
 			{#if uploading}
 				<span class="flex items-center justify-center gap-2">
-					<svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+					<svg class="animate-spin w-4 h-4 text-violet-300" fill="none" viewBox="0 0 24 24">
 						<circle
 							class="opacity-25"
 							cx="12"
@@ -178,8 +164,8 @@
 
 		<!-- Result link -->
 		{#if link}
-			<div class="mt-6 p-4 bg-green-50 border border-green-200 rounded-xl">
-				<p class="text-xs font-medium text-green-700 mb-2 uppercase tracking-wide">
+			<div class="mt-6 p-4 bg-cyan-50 border border-cyan-200 rounded-xl">
+				<p class="text-xs font-medium text-cyan-700 mb-2 uppercase tracking-wide">
 					Share this link
 				</p>
 				<div class="flex items-center gap-2">
@@ -187,11 +173,11 @@
 						type="text"
 						value={link}
 						readonly
-						class="flex-1 text-xs bg-white border border-green-200 rounded-lg px-3 py-2 text-slate-700 outline-none"
+						class="flex-1 text-xs bg-white border border-cyan-200 rounded-lg px-3 py-2 text-slate-700 outline-none"
 					/>
 					<button
 						onclick={() => navigator.clipboard.writeText(link)}
-						class="shrink-0 p-2 bg-white border border-green-200 rounded-lg text-green-600 hover:bg-green-100 transition-colors cursor-pointer"
+						class="shrink-0 p-2 bg-white border border-cyan-200 rounded-lg text-cyan-600 hover:bg-cyan-100 transition-colors cursor-pointer"
 						title="Copy to clipboard"
 					>
 						<svg
@@ -210,7 +196,7 @@
 						</svg>
 					</button>
 				</div>
-				<p class="text-xs text-green-600 mt-2">
+				<p class="text-xs text-cyan-600 mt-2">
 					The recipient just opens this link — the key is in the URL.
 				</p>
 			</div>

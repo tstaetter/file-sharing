@@ -3,6 +3,7 @@
 	import { PUBLIC_API_PREFIX } from '$env/static/public';
 	import { page } from '$app/state';
 	import { downloadFile, base64ToBytes } from 'shazoneSDK';
+	import logo from '$lib/assets/logo.webp';
 
 	let error = $state<string | null>(null);
 	let loading = $state(true);
@@ -53,31 +54,16 @@
 
 <div class="w-full max-w-lg">
 	<div class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-8">
-		<!-- Icon -->
-		<div
-			class="mx-auto w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center mb-6 shadow-md shadow-emerald-200/50"
-		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="w-7 h-7 text-white"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
-				stroke-width="2"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-				/>
-			</svg>
+		<!-- Logo -->
+		<div class="mx-auto w-14 h-14 rounded-xl overflow-hidden mb-6 shadow-md shadow-cyan-200/50">
+			<img src={logo} alt="sha.zone" class="w-full h-full object-cover" />
 		</div>
 
 		<h1 class="text-2xl font-semibold text-slate-800 text-center mb-6">Decrypting your file</h1>
 
 		{#if loading}
 			<div class="flex flex-col items-center gap-4 py-8">
-				<svg class="animate-spin w-10 h-10 text-blue-500" fill="none" viewBox="0 0 24 24">
+				<svg class="animate-spin w-10 h-10 text-violet-500" fill="none" viewBox="0 0 24 24">
 					<circle
 						class="opacity-25"
 						cx="12"
@@ -120,11 +106,11 @@
 		{:else if downloadUrl}
 			<div class="text-center">
 				<div
-					class="mx-auto w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4"
+					class="mx-auto w-16 h-16 bg-cyan-100 rounded-full flex items-center justify-center mb-4"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="w-8 h-8 text-emerald-600"
+						class="w-8 h-8 text-cyan-600"
 						fill="none"
 						viewBox="0 0 24 24"
 						stroke="currentColor"
@@ -148,7 +134,7 @@
 						a.click();
 						document.body.removeChild(a);
 					}}
-					class="w-full py-3 rounded-xl font-medium text-sm transition-all duration-200 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-200/50 hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg active:scale-[0.98] cursor-pointer"
+					class="w-full py-3 rounded-xl font-medium text-sm transition-all duration-200 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white shadow-md shadow-cyan-200/50 hover:from-cyan-600 hover:to-cyan-700 hover:shadow-lg active:scale-[0.98] cursor-pointer"
 				>
 					Download {fileName}
 				</button>
@@ -158,6 +144,6 @@
 	</div>
 
 	<p class="text-center text-xs text-slate-400 mt-6">
-		<a href="/" class="text-blue-500 hover:text-blue-600 transition-colors">← Upload a file</a>
+		<a href="/" class="text-violet-500 hover:text-violet-600 transition-colors">← Upload a file</a>
 	</p>
 </div>
