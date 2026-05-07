@@ -12,7 +12,7 @@ export {
 	base64ToBytes,
 	dataToBytes,
 	extensionFromMime
-} from 'shazoneSDK';
+} from '../../packages/shazoneSDK';
 
 export type {
 	CreateUploadResponse,
@@ -21,7 +21,7 @@ export type {
 	UploadResult,
 	StoredFile,
 	DownloadResult
-} from 'shazoneSDK';
+} from '../../packages/shazoneSDK';
 
 // Convenience wrapper that binds the backend URL from SvelteKit's environment
 export { uploadFile } from './upload';

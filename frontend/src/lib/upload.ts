@@ -1,4 +1,4 @@
-import { uploadFile as sdkUploadFile, type UploadResult } from 'shazoneSDK';
+import { uploadFile as sdkUploadFile, type UploadResult } from '../../packages/shazoneSDK';
 import { PUBLIC_API_PREFIX } from '$env/static/public';
 
 export type { UploadResult };
