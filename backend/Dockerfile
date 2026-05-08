@@ -4,6 +4,8 @@
 # Stage 1: Build
 FROM rust:1.92-slim-bookworm AS builder
 
+ARG REBUILD=false
+
 WORKDIR /app
 
 # Copy manifests first for dependency caching
@@ -16,19 +18,15 @@ RUN mkdir src && \
     mkdir src/handlers && \
     echo '' > src/handlers/mod.rs
 
-# Build dependencies only — cached across builds via BuildKit cache mounts
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/target \
-    cargo build --release && \
+# Build dependencies only — may skip if nothing changed
+RUN echo "Build setup: ${REBUILD}" && cargo build --release && \
     rm -rf src
 
 # Copy actual source code
 COPY src ./src
 
-# Build the real binary, pulling from the same cache mounts for incremental compilation
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/target \
-    cargo build --release && \
+# Build the real binary, always rebuild
+RUN echo "Build ID: ${REBUILD}" && cargo build --release && \
     cp target/release/backend /usr/local/bin/backend
 
 # Stage 2: Runtime

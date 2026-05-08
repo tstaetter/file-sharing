@@ -21,7 +21,8 @@ COPY . .
 # Set the build-time environment variable for Vite ($env/static/public)
 ARG PUBLIC_API_PREFIX
 ENV PUBLIC_API_PREFIX=$PUBLIC_API_PREFIX
-
+ARG PUBLIC_PREFIX
+ENV PUBLIC_PREFIX=$PUBLIC_PREFIX
 # Build the SvelteKit app for production
 RUN npm run build
 

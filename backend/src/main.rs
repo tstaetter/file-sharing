@@ -1,11 +1,11 @@
-use aws_sdk_s3::Client;
 use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
 use aws_sdk_s3::error::ProvideErrorMetadata;
 use aws_sdk_s3::types::{CorsConfiguration, CorsRule};
+use aws_sdk_s3::Client;
 use backend::*;
 use std::env;
 use tracing::{error, info};
-use tracing_subscriber::{EnvFilter, prelude::*};
+use tracing_subscriber::{prelude::*, EnvFilter};
 
 #[tokio::main]
 async fn main() {
