@@ -32,9 +32,10 @@ RUN cargo build --release && \
 COPY src ./src
 
 # Build the real binary.
-# Touch main.rs to ensure this layer always rebuilds even if cargo
-# incorrectly determines nothing changed (e.g. after dependency-only build).
-RUN touch src/main.rs && \
+# Remove the crate's own fingerprint artifacts from the dummy build.
+# Without this, cargo may reuse the cached (empty) library compiled from
+# the dummy lib.rs, causing "cannot find struct AppState" errors.
+RUN rm -rf target/release/.fingerprint/backend-* && \
     cargo build --release && \
     cp target/release/backend /usr/local/bin/backend
 
