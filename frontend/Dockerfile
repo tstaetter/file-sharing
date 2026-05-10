@@ -1,54 +1,82 @@
 # syntax=docker/dockerfile:1
-
-# Build argument: backend API URL baked into client-side code at build time.
-# Override with: docker compose build --build-arg PUBLIC_API_PREFIX=https://api.example.com/v1
-ARG PUBLIC_API_PREFIX=http://localhost:8000/v1
+# Dockerfile for Koyeb deployment of the SvelteKit frontend.
+#
+# Key design decisions:
+# - Multi-stage build: compile in node image, run in slim node image
+# - tini as init (PID 1) for proper signal forwarding (SIGTERM → graceful shutdown)
+# - No Docker HEALTHCHECK — Koyeb performs its own TCP health checks.
+#   Configure an HTTP health check in Koyeb dashboard pointing to /health.
+# - PORT is read from the environment by adapter-node (Koyeb sets this).
+# - ORIGIN should be set in Koyeb's env vars to the public URL of the app.
+# - PUBLIC_API_PREFIX is baked in at build time via --build-arg.
+# - node_modules is NOT copied to runtime — the adapter-node build output
+#   in build/ is self-contained.
 
 # ── Stage 1: Build ──────────────────────────────────────────────────────────
 FROM node:22-slim AS builder
 
 WORKDIR /app
 
-# Copy manifests and local packages first for dependency caching
+# Copy package manifests first for dependency caching.
+# This layer only rebuilds when package.json or package-lock.json change.
 COPY package.json package-lock.json ./
 COPY packages/shazoneSDK ./packages/shazoneSDK/
 
 RUN npm ci
 
-# Copy source code
+# Copy the rest of the source code
 COPY . .
 
-# Set the build-time environment variable for Vite ($env/static/public)
-ARG PUBLIC_API_PREFIX
+# Build-time environment variables baked into the client bundle by Vite.
+# These must be prefixed with PUBLIC_ to be accessible in browser code
+# via $env/static/public.
+ARG PUBLIC_API_PREFIX=https://spare-lucine-unartig-a663d382.koyeb.app/v1
 ENV PUBLIC_API_PREFIX=$PUBLIC_API_PREFIX
+
 ARG PUBLIC_PREFIX
 ENV PUBLIC_PREFIX=$PUBLIC_PREFIX
-# Build the SvelteKit app for production
-RUN npm run build
 
-# Prune dev-only dependencies from node_modules for a leaner runtime image
-RUN npm prune --omit=dev
+# Build the SvelteKit app for production.
+# Output goes to build/ (adapter-node).
+RUN npm run build
 
 # ── Stage 2: Runtime ───────────────────────────────────────────────────────
 FROM node:22-slim
 
 WORKDIR /app
 
-RUN groupadd -r app && useradd -r -g app app
+# Install runtime dependencies:
+# - tini: minimal init process for proper signal handling
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends tini && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd -r app && useradd -r -g app app
 
-# Copy production dependencies and built app from builder
+# Copy only the self-contained build output from the builder stage.
+# adapter-node bundles everything needed to run into build/.
 COPY --from=builder /app/build ./build
-COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
+# OCI labels for container metadata
+LABEL org.opencontainers.image.title="file-sharing-frontend" \
+      org.opencontainers.image.description="Frontend for end-to-end encrypted file sharing" \
+      org.opencontainers.image.source="https://github.com/ttstt/file-sharing"
+
 USER app
+
+# Koyeb sets PORT at runtime; adapter-node reads it automatically.
+# EXPOSE is informational only.
 EXPOSE 3000
 
-# SvelteKit adapter-node configuration
-# PORT  – the port the server listens on (default 3000)
-# ORIGIN – the canonical origin of the app, required in production
-#          to prevent host-header spoofing. Override for your domain.
-ENV PORT=3000
+# ORIGIN should be set in Koyeb's environment variables to the public URL
+# of the deployed app (e.g. https://sha.zone). This prevents host-header
+# spoofing attacks. Falls back to localhost for local development.
 ENV ORIGIN=http://localhost:5173
 
+# tini as the entrypoint ensures:
+# - SIGTERM from Koyeb/Docker is properly forwarded to the Node process
+# - Zombie processes are reaped (good practice)
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+# adapter-node's build/index.js starts an HTTP server on PORT.
 CMD ["node", "build"]
