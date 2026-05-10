@@ -13,14 +13,28 @@ const MAX_CONCURRENT: usize = 10;
 
 #[tokio::main]
 async fn main() -> CleanupResult<()> {
+    // eprintln goes to stderr and is visible even before tracing is initialised.
+    // This confirms the binary actually started executing.
+    eprintln!("cleanup-orphaned-uploads: process started, initialising...");
+
     dotenvy::dotenv().ok();
 
-    // Init tracing, write logs to STDOUT
+    // Default to info-level logging if RUST_LOG is not set.
+    // Without this, EnvFilter::from_default_env() produces no output at all
+    // when RUST_LOG is absent, making startup failures invisible on Koyeb.
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "info");
+    }
+
+    // Init tracing, write logs to STDOUT.
+    // Disable ANSI colors in Docker containers (no TTY) to avoid garbled output.
+    let is_tty = atty::is(atty::Stream::Stdout);
+
     tracing_subscriber::registry()
         .with(EnvFilter::from_default_env())
         .with(
             tracing_subscriber::fmt::layer()
-                .with_ansi(true)
+                .with_ansi(is_tty)
                 .with_target(true)
                 .with_level(true)
                 .with_thread_ids(false)
@@ -29,10 +43,19 @@ async fn main() -> CleanupResult<()> {
         )
         .init();
 
+    info!("Cleanup worker starting...");
+
     let account_id = env::var("R2_ACCOUNT_ID").expect("R2_ACCOUNT_ID must be set");
     let access_key = env::var("R2_ACCESS_KEY_ID").expect("R2_ACCESS_KEY_ID must be set");
     let secret_key = env::var("R2_SECRET_ACCESS_KEY").expect("R2_SECRET_ACCESS_KEY must be set");
     let bucket = env::var("R2_BUCKET").expect("R2_BUCKET must be set");
+
+    info!(
+        bucket = %bucket,
+        account_id = %account_id,
+        "Connecting to Cloudflare R2"
+    );
+
     let endpoint_url = format!("https://{}.r2.cloudflarestorage.com", account_id);
     let credentials = Credentials::new(access_key, secret_key, None, None, "cloudflare-r2");
     let config = aws_sdk_s3::Config::builder()
@@ -43,6 +66,9 @@ async fn main() -> CleanupResult<()> {
         .credentials_provider(credentials)
         .build();
     let client = Client::from_conf(config);
+
+    info!("S3 client initialized");
+
     // cutoff: alles älter als X Stunden löschen
     let cutoff = Utc::now() - Duration::hours(6);
 
