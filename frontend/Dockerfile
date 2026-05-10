@@ -30,10 +30,10 @@ COPY . .
 # Build-time environment variables baked into the client bundle by Vite.
 # These must be prefixed with PUBLIC_ to be accessible in browser code
 # via $env/static/public.
-ARG PUBLIC_API_PREFIX=https://spare-lucine-unartig-a663d382.koyeb.app/v1
+ARG PUBLIC_API_PREFIX=https://api.filez.zone/v1
 ENV PUBLIC_API_PREFIX=$PUBLIC_API_PREFIX
 
-ARG PUBLIC_PREFIX=https://damaged-debby-unartig-2b50a1f9.koyeb.app
+ARG PUBLIC_PREFIX=https://www.filez.zone
 ENV PUBLIC_PREFIX=$PUBLIC_PREFIX
 
 # Build the SvelteKit app for production.
