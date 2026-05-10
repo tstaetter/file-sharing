@@ -10,7 +10,18 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 
 #[tokio::main]
 async fn main() {
+    // eprintln goes to stderr and is visible even before tracing is initialised.
+    // This confirms the binary actually started executing.
+    eprintln!("backend: process started, initialising...");
+
     dotenvy::dotenv().ok();
+
+    // Default to info-level logging if RUST_LOG is not set.
+    // Without this, EnvFilter::from_default_env() produces no output at all
+    // when RUST_LOG is absent, making startup failures invisible on Koyeb.
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "info");
+    }
 
     // Init tracing, write logs to STDOUT.
     // Disable ANSI colors in Docker containers (no TTY) to avoid garbled output.

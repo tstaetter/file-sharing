@@ -2,59 +2,74 @@
 # Dockerfile for Koyeb deployment.
 # Build: docker build -t file-sharing-backend .
 # Koyeb auto-detects Dockerfiles and sets PORT env var.
+#
+# Key design decisions:
+# - tini as init (PID 1) for proper signal forwarding and zombie reaping
+# - Multi-stage build: compile in rust image, run in slim debian
+# - Dependency caching: Cargo.toml/Cargo.lock copied first, dummy src built
+# - No Docker HEALTHCHECK — Koyeb performs its own TCP health checks
+#   Configure an HTTP health check in Koyeb dashboard pointing to /health
 
 # Stage 1: Build
-FROM rust:1.92-slim-bookworm AS builder
+FROM rust:1-slim-bookworm AS builder
 
 WORKDIR /app
 
 # Copy manifests first for dependency caching
 COPY Cargo.toml Cargo.lock ./
 
-# Create dummy source files to compile and cache dependencies
-RUN mkdir src && \
+# Create dummy source files to compile and cache dependencies.
+# This ensures dependencies are only rebuilt when Cargo.toml or Cargo.lock change.
+RUN mkdir -p src/handlers && \
     echo 'fn main() {}' > src/main.rs && \
     echo '' > src/lib.rs && \
-    mkdir src/handlers && \
     echo '' > src/handlers/mod.rs
 
-# Build dependencies only — cached unless Cargo.toml/Cargo.lock change
 RUN cargo build --release && \
     rm -rf src
 
 # Copy actual source code
 COPY src ./src
 
-# Build the real binary
-RUN cargo build --release && \
+# Build the real binary.
+# Touch main.rs to ensure this layer always rebuilds even if cargo
+# incorrectly determines nothing changed (e.g. after dependency-only build).
+RUN touch src/main.rs && \
+    cargo build --release && \
     cp target/release/backend /usr/local/bin/backend
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim
 
-# Install runtime dependencies: ca-certificates for TLS, curl for health checks
+# Install runtime dependencies:
+# - ca-certificates: TLS verification for R2 HTTPS connections
+# - tini: minimal init process for proper signal handling (SIGTERM → tokio)
+# - curl: useful for debugging (optional, can be removed to shrink image)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates curl && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        tini && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd -r app && useradd -r -g app app
 
 COPY --from=builder /usr/local/bin/backend /usr/local/bin/backend
 
-# OCI labels for Koyeb and container metadata
+# OCI labels for container metadata
 LABEL org.opencontainers.image.title="file-sharing-backend" \
       org.opencontainers.image.description="Backend API for end-to-end encrypted file sharing" \
       org.opencontainers.image.source="https://github.com/ttstt/file-sharing"
 
 USER app
 
-# Koyeb sets PORT at runtime; EXPOSE is informational
+# Koyeb sets PORT at runtime; EXPOSE is informational only
 EXPOSE 8000
 
-# Health check using the /health endpoint.
-# Koyeb also performs its own TCP health checks by default.
-# Configure an HTTP health check in Koyeb's dashboard pointing to /health for faster detection.
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:"${PORT:-8000}"/health || exit 1
+# tini as the entrypoint ensures:
+# - SIGTERM from Koyeb/Docker is properly forwarded to the backend process
+# - Zombie processes are reaped (not critical here but good practice)
+# - The container shuts down cleanly instead of exiting code 0 instantly
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
-# Use exec form for proper signal forwarding (SIGTERM → tokio graceful shutdown)
-CMD ["backend"]
+# Use exec form with tini — backend runs as a child of tini (PID 1)
+CMD ["/usr/local/bin/backend"]

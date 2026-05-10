@@ -3,8 +3,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      args:
-        REBUILD: "v2-may-7"
+
     container_name: file-sharing-backend
     ports:
       - "8000:8000"
@@ -13,7 +12,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test:
-        ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:8000/v1/"]
+        ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:8000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
