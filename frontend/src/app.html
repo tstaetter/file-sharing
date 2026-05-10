@@ -13,6 +13,37 @@
 			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
 			rel="stylesheet"
 		/>
+		<script>
+			window.op =
+				window.op ||
+				(function () {
+					var n = [];
+					return new Proxy(
+						function () {
+							arguments.length && n.push([].slice.call(arguments));
+						},
+						{
+							get: function (t, r) {
+								return 'q' === r
+									? n
+									: function () {
+											n.push([r].concat([].slice.call(arguments)));
+										};
+							},
+							has: function (t, r) {
+								return 'q' === r;
+							}
+						}
+					);
+				})();
+			window.op('init', {
+				clientId: 'cab78c03-d182-427a-9715-0056164e6762',
+				trackScreenViews: true,
+				trackOutgoingLinks: true,
+				trackAttributes: true
+			});
+		</script>
+		<script src="https://openpanel.dev/op1.js" defer async></script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover" class="font-sans">
