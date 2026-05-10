@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1
 # Dockerfile for Koyeb deployment of the cleanup-orphaned-uploads worker.
 #
-# This is a batch job — it runs once, scans R2 for orphaned multipart
-# uploads older than 6 hours, aborts them, and exits.
-# Deploy on Koyeb as a Worker service type with a cron schedule (e.g. hourly).
+# Architecture: Long-running container using Supercronic to schedule the
+# cleanup binary every 6 hours. Supercronic runs as PID 1, handles signals
+# properly, and logs job output to stdout for Koyeb log collection.
 #
 # Key design decisions:
 # - Multi-stage build: compile in rust image, run in slim debian
 # - Dependency caching: Cargo.toml/Cargo.lock copied first, dummy src built
 # - Fingerprint cleanup before real build (avoids "cannot find struct" errors)
-# - tini as init (PID 1) for proper signal forwarding
+# - Supercronic as PID 1 for in-container cron scheduling
 # - Non-root user for security
-# - No PORT, no health checks — workers don't serve HTTP traffic
+# - No PORT, no health checks — this is a background worker
 
 # ── Stage 1: Build ──────────────────────────────────────────────────────────
 FROM rust:1-slim-bookworm AS builder
@@ -23,7 +23,8 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 
 # Create dummy source files to compile and cache dependencies.
-# This ensures dependencies are only rebuilt when Cargo.toml or Cargo.lock change.
+# This ensures all third-party crates are compiled and cached in a
+# separate layer, only invalidated when Cargo.toml or Cargo.lock change.
 RUN mkdir -p src && \
     echo 'fn main() {}' > src/main.rs && \
     echo '' > src/lib.rs
@@ -38,6 +39,7 @@ COPY src ./src
 # Remove the crate's own fingerprint artifacts from the dummy build.
 # Without this, cargo may reuse the cached (empty) library compiled from
 # the dummy lib.rs, causing "cannot find struct" errors.
+# The wildcard covers all fingerprint files for this crate.
 RUN rm -rf target/release/.fingerprint/cleanup-orphaned-uploads-* && \
     cargo build --release && \
     cp target/release/cleanup-orphaned-uploads /usr/local/bin/cleanup-orphaned-uploads
@@ -45,30 +47,53 @@ RUN rm -rf target/release/.fingerprint/cleanup-orphaned-uploads-* && \
 # ── Stage 2: Runtime ───────────────────────────────────────────────────────
 FROM debian:bookworm-slim
 
+# Supercronic version — check https://github.com/aptible/supercronic/releases
+# for the latest release and updated SHA1SUM.
+ARG SUPERCRONIC_VERSION=v0.2.45
+ARG SUPERCRONIC_SHA1SUM=e894b193bea75a5ee644e700c59e30eedc804cf7
+
+WORKDIR /app
+
 # Install runtime dependencies:
 # - ca-certificates: TLS verification for R2 HTTPS connections
-# - tini: minimal init process for proper signal handling
+# - curl: used to download Supercronic (removed after to keep image slim)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
-        tini && \
+        curl && \
+    \
+    # Download and verify Supercronic
+    curl -fsSL "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-amd64" \
+        -o /usr/local/bin/supercronic && \
+    echo "${SUPERCRONIC_SHA1SUM}  /usr/local/bin/supercronic" | sha1sum -c - && \
+    chmod +x /usr/local/bin/supercronic && \
+    \
+    # Clean up: remove curl (no longer needed), create non-root user
+    apt-get remove -y curl && \
+    apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd -r app && useradd -r -g app app
 
+# Copy the compiled worker binary from the builder stage
 COPY --from=builder /usr/local/bin/cleanup-orphaned-uploads /usr/local/bin/cleanup-orphaned-uploads
+
+# Create the crontab file that Supercronic will read.
+# Runs every 6 hours at minute 0 (00:00, 06:00, 12:00, 18:00 UTC).
+# The worker reads RUST_LOG from the environment; set RUST_LOG=info on
+# Koyeb to see progress output for each run.
+COPY --chown=app:app <<CRONTAB /etc/crontab
+0 */6 * * * /usr/local/bin/cleanup-orphaned-uploads
+CRONTAB
 
 # OCI labels for container metadata
 LABEL org.opencontainers.image.title="cleanup-orphaned-uploads" \
-      org.opencontainers.image.description="Background worker that aborts orphaned multipart uploads older than 6 hours" \
+      org.opencontainers.image.description="Background worker that aborts orphaned multipart uploads older than 6 hours. Runs every 6 hours via Supercronic." \
       org.opencontainers.image.source="https://github.com/ttstt/file-sharing"
 
 USER app
 
-# tini as the entrypoint ensures:
-# - SIGTERM from Koyeb/Docker is properly forwarded to the worker process
-# - The worker can shut down gracefully if it receives a signal mid-run
-ENTRYPOINT ["/usr/bin/tini", "--"]
-
-# Run the cleanup worker once and exit.
-# Set RUST_LOG=info on Koyeb to see progress logs.
-CMD ["/usr/local/bin/cleanup-orphaned-uploads"]
+# Supercronic runs as PID 1:
+# - Handles SIGTERM/SIGINT for graceful container shutdown
+# - Reads /etc/crontab and executes jobs on schedule
+# - Forwards job stdout/stderr to the container's stdout for log collection
+ENTRYPOINT ["/usr/local/bin/supercronic", "/etc/crontab"]
