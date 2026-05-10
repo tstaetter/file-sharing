@@ -4,7 +4,7 @@
 	let { children } = $props();
 
 	const currentYear = new Date().getFullYear();
-	const siteUrl = 'https://sha.zone';
+	const siteUrl = 'https://filez.zone';
 </script>
 
 <svelte:head>
@@ -15,9 +15,9 @@
 		content="End-to-end encrypted file sharing. Files are encrypted in your browser before upload and deleted after download. No accounts, no tracking."
 	/>
 	<meta name="robots" content="index, follow" />
-	<meta property="og:site_name" content="sha.zone" />
+	<meta property="og:site_name" content="filez.zone" />
 	<meta property="og:type" content="website" />
-	<meta property="og:title" content="sha.zone — Secure File Sharing" />
+	<meta property="og:title" content="filez.zone — Secure File Sharing" />
 	<meta
 		property="og:description"
 		content="End-to-end encrypted file sharing. Files are encrypted in your browser and deleted after download. No accounts needed."
@@ -26,7 +26,7 @@
 	<meta property="og:image" content="{siteUrl}/logo.webp" />
 	<meta property="og:image:type" content="image/webp" />
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="sha.zone — Secure File Sharing" />
+	<meta name="twitter:title" content="filez.zone — Secure File Sharing" />
 	<meta
 		name="twitter:description"
 		content="End-to-end encrypted file sharing. Files are encrypted in your browser and deleted after download. No accounts needed."
@@ -46,7 +46,7 @@
 		<div
 			class="mx-auto max-w-4xl px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400"
 		>
-			<span>&copy; {currentYear} sha.zone</span>
+			<span>&copy; {currentYear} filez.zone</span>
 			<nav class="flex gap-4">
 				<a href="/tos" class="hover:text-slate-600 transition-colors">Terms of Service</a>
 				<a href="/privacy" class="hover:text-slate-600 transition-colors">Privacy Policy</a>

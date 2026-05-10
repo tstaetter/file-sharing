@@ -4,4 +4,4 @@ Allow: /
 Disallow: /f/
 
 # Sitemap
-Sitemap: https://sha.zone/sitemap.xml
+Sitemap: https://filez.zone/sitemap.xml

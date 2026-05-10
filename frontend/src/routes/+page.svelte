@@ -30,31 +30,31 @@
 </script>
 
 <svelte:head>
-	<title>sha.zone — Secure End-to-End Encrypted File Sharing</title>
+	<title>filez.zone — Secure End-to-End Encrypted File Sharing</title>
 	<meta
 		name="description"
 		content="Share files securely with end-to-end AES-256-GCM encryption. Files are encrypted in your browser and deleted after download. No accounts, no tracking, no server access to your data."
 	/>
-	<meta property="og:title" content="sha.zone — Secure End-to-End Encrypted File Sharing" />
+	<meta property="og:title" content="filez.zone — Secure End-to-End Encrypted File Sharing" />
 	<meta
 		property="og:description"
 		content="Share files securely with end-to-end AES-256-GCM encryption. Files are encrypted in your browser and deleted after download. No accounts, no tracking."
 	/>
-	<meta property="og:url" content="https://sha.zone" />
+	<meta property="og:url" content="https://filez.zone" />
 	<meta property="og:type" content="website" />
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="sha.zone — Secure End-to-End Encrypted File Sharing" />
+	<meta name="twitter:title" content="filez.zone — Secure End-to-End Encrypted File Sharing" />
 	<meta
 		name="twitter:description"
 		content="Share files securely with end-to-end AES-256-GCM encryption. Files are encrypted in your browser and deleted after download."
 	/>
-	<link rel="canonical" href="https://sha.zone" />
+	<link rel="canonical" href="https://filez.zone" />
 	<script type="application/ld+json">
 		{{
 			"@context": "https://schema.org",
 			"@type": "WebApplication",
-			"name": "sha.zone",
-			"url": "https://sha.zone",
+			"name": "filez.zone",
+			"url": "https://filez.zone",
 			"description": "End-to-end encrypted file sharing. Files are encrypted in your browser and deleted after download.",
 			"applicationCategory": "UtilityApplication",
 			"operatingSystem": "Any",
@@ -79,7 +79,7 @@
 	<div class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-8">
 		<!-- Logo -->
 		<div class="mx-auto w-14 h-14 rounded-xl overflow-hidden mb-6 shadow-md shadow-violet-200/50">
-			<img src={logo} alt="sha.zone" class="w-full h-full object-cover" />
+			<img src={logo} alt="filez.zone" class="w-full h-full object-cover" />
 		</div>
 
 		<!-- Title -->

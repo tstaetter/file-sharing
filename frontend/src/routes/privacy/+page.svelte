@@ -7,26 +7,26 @@
 </script>
 
 <svelte:head>
-	<title>Privacy Policy — sha.zone</title>
+	<title>Privacy Policy — filez.zone</title>
 	<meta
 		name="description"
-		content="Privacy Policy for sha.zone. Learn how we handle your data, including end-to-end encryption, burn-after-reading file deletion, and our commitment to zero tracking."
+		content="Privacy Policy for filez.zone. Learn how we handle your data, including end-to-end encryption, burn-after-reading file deletion, and our commitment to zero tracking."
 	/>
 	<meta name="robots" content="index, follow" />
-	<meta property="og:title" content="Privacy Policy — sha.zone" />
+	<meta property="og:title" content="Privacy Policy — filez.zone" />
 	<meta
 		property="og:description"
-		content="Privacy Policy for sha.zone. End-to-end encrypted file sharing with zero tracking and automatic file deletion after download."
+		content="Privacy Policy for filez.zone. End-to-end encrypted file sharing with zero tracking and automatic file deletion after download."
 	/>
-	<meta property="og:url" content="https://sha.zone/privacy" />
+	<meta property="og:url" content="https://filez.zone/privacy" />
 	<meta property="og:type" content="website" />
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="Privacy Policy — sha.zone" />
+	<meta name="twitter:title" content="Privacy Policy — filez.zone" />
 	<meta
 		name="twitter:description"
-		content="Privacy Policy for sha.zone. Learn how we protect your data with end-to-end encryption and automatic deletion."
+		content="Privacy Policy for filez.zone. Learn how we protect your data with end-to-end encryption and automatic deletion."
 	/>
-	<link rel="canonical" href="https://sha.zone/privacy" />
+	<link rel="canonical" href="https://filez.zone/privacy" />
 </svelte:head>
 
 <div class="w-full max-w-2xl">
@@ -40,16 +40,16 @@
 			<section>
 				<h2 class="text-base font-semibold text-slate-800 mb-2">1. Overview</h2>
 				<p>
-					sha.zone ("we", "us", or "our") operates the file-sharing service available at <a
+					filez.zone ("we", "us", or "our") operates the file-sharing service available at <a
 						href="/"
-						class="text-blue-500 hover:text-blue-600 underline">sha.zone</a
+						class="text-blue-500 hover:text-blue-600 underline">filez.zone</a
 					>. This Privacy Policy explains how we collect, use, and protect information when you use
 					our Service.
 				</p>
 				<p class="mt-2">
-					<strong>Core principle:</strong> We designed sha.zone so that we never have access to the content
-					of your files. All encryption and decryption happens in your browser. The encryption key is
-					never transmitted to our servers.
+					<strong>Core principle:</strong> We designed filez.zone so that we never have access to the
+					content of your files. All encryption and decryption happens in your browser. The encryption
+					key is never transmitted to our servers.
 				</p>
 			</section>
 
@@ -163,7 +163,7 @@
 			<section>
 				<h2 class="text-base font-semibold text-slate-800 mb-2">6. Cookies</h2>
 				<p>
-					sha.zone does not use cookies for tracking, advertising, or analytics. For details about
+					filez.zone does not use cookies for tracking, advertising, or analytics. For details about
 					the minimal browser storage we use, see our <a
 						href="/cookies"
 						class="text-blue-500 hover:text-blue-600 underline">Cookie Policy</a
@@ -217,8 +217,8 @@
 					Because our Service is designed to minimize data collection and automatically deletes
 					files after download, most of these rights are fulfilled by design. For any inquiries,
 					contact us at <a
-						href="mailto:privacy@sha.zone"
-						class="text-blue-500 hover:text-blue-600 underline">privacy@sha.zone</a
+						href="mailto:privacy@filez.zone"
+						class="text-blue-500 hover:text-blue-600 underline">privacy@filez.zone</a
 					>.
 				</p>
 			</section>
@@ -236,8 +236,8 @@
 				<h2 class="text-base font-semibold text-slate-800 mb-2">11. Contact</h2>
 				<p>
 					For privacy-related questions or concerns, please contact us at <a
-						href="mailto:privacy@sha.zone"
-						class="text-blue-500 hover:text-blue-600 underline">privacy@sha.zone</a
+						href="mailto:privacy@filez.zone"
+						class="text-blue-500 hover:text-blue-600 underline">privacy@filez.zone</a
 					>.
 				</p>
 			</section>
@@ -245,6 +245,6 @@
 	</div>
 
 	<p class="text-center text-xs text-slate-400 mt-6">
-		<a href="/" class="text-blue-500 hover:text-blue-600 transition-colors">← Back to sha.zone</a>
+		<a href="/" class="text-blue-500 hover:text-blue-600 transition-colors">← Back to filez.zone</a>
 	</p>
 </div>

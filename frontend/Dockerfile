@@ -69,7 +69,7 @@ USER app
 EXPOSE 3000
 
 # ORIGIN should be set in Koyeb's environment variables to the public URL
-# of the deployed app (e.g. https://sha.zone). This prevents host-header
+# of the deployed app (e.g. https://filez.zone). This prevents host-header
 # spoofing attacks. Falls back to localhost for local development.
 ENV ORIGIN=http://localhost:5173
 

@@ -43,7 +43,7 @@ export type ProgressCallback = (progress: number) => void;
  * **The backend never sees plaintext** — all encryption happens locally
  * in the browser using the Web Crypto API.
  *
- * @param apiPrefix  The base URL of the backend API, e.g. `"https://api.sha.zone/v1"`.
+ * @param apiPrefix  The base URL of the backend API, e.g. `"https://api.filez.zone/v1"`.
  * @param file       The `File` object to upload (from an `<input type="file">` or drag-and-drop).
  * @param onProgress Optional callback invoked after each chunk is uploaded.
  *                    Receives a number between 0 (just started) and 1 (all chunks uploaded).
@@ -56,8 +56,8 @@ export type ProgressCallback = (progress: number) => void;
  *
  * const input = document.querySelector('input[type=file]');
  * const file = input.files[0];
- * const result = await uploadFile('https://api.sha.zone/v1', file, (p) => console.log(`${(p * 100).toFixed(0)}%`));
- * const url = createCapabilityUrl('https://sha.zone', result.fileId, result.raw);
+ * const result = await uploadFile('https://api.filez.zone/v1', file, (p) => console.log(`${(p * 100).toFixed(0)}%`));
+ * const url = createCapabilityUrl('https://filez.zone', result.fileId, result.raw);
  * console.log('Share this link:', url);
  * ```
  */

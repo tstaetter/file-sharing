@@ -58,7 +58,7 @@ function consumeBytes(pending: Uint8Array[], n: number): Uint8Array {
  * The backend deletes the file from R2 **immediately after serving it**
  * ("burn after reading"), so a file can only be downloaded once.
  *
- * @param apiPrefix  The base URL of the backend API (e.g. `"https://api.sha.zone/v1"`).
+ * @param apiPrefix  The base URL of the backend API (e.g. `"https://api.filez.zone/v1"`).
  * @param fileId     The UUID of the file to download.
  * @param rawKey     The raw AES-256 key bytes (extracted from the capability URL hash).
  * @param onProgress Optional callback invoked during download and decryption.

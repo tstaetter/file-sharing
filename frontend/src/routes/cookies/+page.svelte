@@ -7,26 +7,26 @@
 </script>
 
 <svelte:head>
-	<title>Cookie Policy — sha.zone</title>
+	<title>Cookie Policy — filez.zone</title>
 	<meta
 		name="description"
-		content="Cookie Policy for sha.zone. We don't use tracking, advertising, or analytics cookies. Learn about the minimal browser storage we use and how Cloudflare's security cookies work."
+		content="Cookie Policy for filez.zone. We don't use tracking, advertising, or analytics cookies. Learn about the minimal browser storage we use and how Cloudflare's security cookies work."
 	/>
 	<meta name="robots" content="index, follow" />
-	<meta property="og:title" content="Cookie Policy — sha.zone" />
+	<meta property="og:title" content="Cookie Policy — filez.zone" />
 	<meta
 		property="og:description"
-		content="Cookie Policy for sha.zone. No tracking cookies, no analytics, no ads. Learn about our minimal approach to browser storage."
+		content="Cookie Policy for filez.zone. No tracking cookies, no analytics, no ads. Learn about our minimal approach to browser storage."
 	/>
-	<meta property="og:url" content="https://sha.zone/cookies" />
+	<meta property="og:url" content="https://filez.zone/cookies" />
 	<meta property="og:type" content="website" />
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="Cookie Policy — sha.zone" />
+	<meta name="twitter:title" content="Cookie Policy — filez.zone" />
 	<meta
 		name="twitter:description"
-		content="Cookie Policy for sha.zone. No tracking, no analytics, no advertising cookies."
+		content="Cookie Policy for filez.zone. No tracking, no analytics, no advertising cookies."
 	/>
-	<link rel="canonical" href="https://sha.zone/cookies" />
+	<link rel="canonical" href="https://filez.zone/cookies" />
 </svelte:head>
 
 <div class="w-full max-w-2xl">
@@ -40,7 +40,7 @@
 			<section>
 				<h2 class="text-base font-semibold text-slate-800 mb-2">1. Overview</h2>
 				<p>
-					sha.zone is designed with privacy as a core principle. This Cookie Policy explains what
+					filez.zone is designed with privacy as a core principle. This Cookie Policy explains what
 					browser storage technologies we use, why we use them, and — more importantly — what we <strong
 						>do not</strong
 					> use.
@@ -118,7 +118,7 @@
 					bot management and security services. These cookies are:
 				</p>
 				<ul class="list-disc pl-5 mt-2 space-y-1">
-					<li>Set by Cloudflare, not by sha.zone.</li>
+					<li>Set by Cloudflare, not by filez.zone.</li>
 					<li>Used solely for security and performance purposes.</li>
 					<li>Not used for tracking, advertising, or building user profiles.</li>
 					<li>
@@ -190,8 +190,8 @@
 				<p>
 					If you have questions about this Cookie Policy or our use of browser storage technologies,
 					please contact us at <a
-						href="mailto:privacy@sha.zone"
-						class="text-blue-500 hover:text-blue-600 underline">privacy@sha.zone</a
+						href="mailto:privacy@filez.zone"
+						class="text-blue-500 hover:text-blue-600 underline">privacy@filez.zone</a
 					>.
 				</p>
 			</section>
@@ -199,6 +199,6 @@
 	</div>
 
 	<p class="text-center text-xs text-slate-400 mt-6">
-		<a href="/" class="text-blue-500 hover:text-blue-600 transition-colors">← Back to sha.zone</a>
+		<a href="/" class="text-blue-500 hover:text-blue-600 transition-colors">← Back to filez.zone</a>
 	</p>
 </div>

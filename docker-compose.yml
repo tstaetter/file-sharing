@@ -37,5 +37,5 @@ services:
       # SvelteKit adapter-node runtime vars
       - PORT=3000
       # ORIGIN must match the external URL users see in the browser.
-      # Override for production: ORIGIN=https://sha.zone
+      # Override for production: ORIGIN=https://filez.zone
       - ORIGIN=http://localhost:5173

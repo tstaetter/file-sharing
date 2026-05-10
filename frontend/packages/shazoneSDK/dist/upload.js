@@ -14,7 +14,7 @@ import { chunkFile, DEFAULT_CHUNK_SIZE } from './chunk';
  * **The backend never sees plaintext** — all encryption happens locally
  * in the browser using the Web Crypto API.
  *
- * @param apiPrefix  The base URL of the backend API, e.g. `"https://api.sha.zone/v1"`.
+ * @param apiPrefix  The base URL of the backend API, e.g. `"https://api.filez.zone/v1"`.
  * @param file       The `File` object to upload (from an `<input type="file">` or drag-and-drop).
  * @param onProgress Optional callback invoked after each chunk is uploaded.
  *                    Receives a number between 0 (just started) and 1 (all chunks uploaded).
@@ -27,105 +27,107 @@ import { chunkFile, DEFAULT_CHUNK_SIZE } from './chunk';
  *
  * const input = document.querySelector('input[type=file]');
  * const file = input.files[0];
- * const result = await uploadFile('https://api.sha.zone/v1', file, (p) => console.log(`${(p * 100).toFixed(0)}%`));
- * const url = createCapabilityUrl('https://sha.zone', result.fileId, result.raw);
+ * const result = await uploadFile('https://api.filez.zone/v1', file, (p) => console.log(`${(p * 100).toFixed(0)}%`));
+ * const url = createCapabilityUrl('https://filez.zone', result.fileId, result.raw);
  * console.log('Share this link:', url);
  * ```
  */
 export async function uploadFile(apiPrefix, file, onProgress) {
-    // Milestone-based progress:
-    //   0.05 — key generated, upload initiated
-    //   0.05–0.95 — chunks uploaded (proportional to chunk count)
-    //   1.00 — complete-upload finished
-    onProgress?.(0.05);
-    const { key, raw } = await generateKey();
-    const fileId = crypto.randomUUID();
-    const totalChunks = Math.max(1, Math.ceil(file.size / DEFAULT_CHUNK_SIZE));
-    const init = await fetch(`${apiPrefix}/create-upload`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            file_id: fileId,
-            content_type: file.type || null,
-            chunk_size: DEFAULT_CHUNK_SIZE
-        })
-    });
-    if (!init.ok) {
-        throw new Error(`create-upload failed: ${init.status} ${init.statusText}`);
-    }
-    const { upload_id, key: storageKey } = (await init.json());
-    let part = 1;
-    const parts = [];
-    for await (const chunk of chunkFile(file, DEFAULT_CHUNK_SIZE)) {
-        const { iv, data } = await encryptChunk(key, chunk);
-        const payload = new Uint8Array(iv.length + data.length);
-        payload.set(iv);
-        payload.set(data, iv.length);
-        const signRes = await fetch(`${apiPrefix}/sign-parts`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                key: storageKey,
-                upload_id,
-                part_numbers: [part]
-            })
-        });
-        if (!signRes.ok) {
-            // Attempt to clean up on failure.
-            await fetch(`${apiPrefix}/abort-upload`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: storageKey, upload_id })
-            });
-            throw new Error(`sign-parts failed for part ${part}: ${signRes.status} ${signRes.statusText}`);
-        }
-        const urls = (await signRes.json());
-        const url = urls[0]?.url;
-        if (!url) {
-            await fetch(`${apiPrefix}/abort-upload`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: storageKey, upload_id })
-            });
-            throw new Error(`sign-parts returned no URL for part ${part}`);
-        }
-        const uploadRes = await fetch(url, {
-            method: 'PUT',
-            body: payload
-        });
-        if (!uploadRes.ok) {
-            await fetch(`${apiPrefix}/abort-upload`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: storageKey, upload_id })
-            });
-            throw new Error(`part ${part} upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
-        }
-        parts.push({
-            part_number: part,
-            etag: uploadRes.headers.get('ETag')
-        });
-        onProgress?.(0.05 + 0.9 * (part / totalChunks));
-        part++;
-    }
-    const completeRes = await fetch(`${apiPrefix}/complete-upload`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            key: storageKey,
-            upload_id,
-            parts
-        })
-    });
-    if (!completeRes.ok) {
-        await fetch(`${apiPrefix}/abort-upload`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: storageKey, upload_id })
-        });
-        throw new Error(`complete-upload failed: ${completeRes.status} ${completeRes.statusText}`);
-    }
-    onProgress?.(1);
-    return { raw, fileId };
+	// Milestone-based progress:
+	//   0.05 — key generated, upload initiated
+	//   0.05–0.95 — chunks uploaded (proportional to chunk count)
+	//   1.00 — complete-upload finished
+	onProgress?.(0.05);
+	const { key, raw } = await generateKey();
+	const fileId = crypto.randomUUID();
+	const totalChunks = Math.max(1, Math.ceil(file.size / DEFAULT_CHUNK_SIZE));
+	const init = await fetch(`${apiPrefix}/create-upload`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			file_id: fileId,
+			content_type: file.type || null,
+			chunk_size: DEFAULT_CHUNK_SIZE
+		})
+	});
+	if (!init.ok) {
+		throw new Error(`create-upload failed: ${init.status} ${init.statusText}`);
+	}
+	const { upload_id, key: storageKey } = await init.json();
+	let part = 1;
+	const parts = [];
+	for await (const chunk of chunkFile(file, DEFAULT_CHUNK_SIZE)) {
+		const { iv, data } = await encryptChunk(key, chunk);
+		const payload = new Uint8Array(iv.length + data.length);
+		payload.set(iv);
+		payload.set(data, iv.length);
+		const signRes = await fetch(`${apiPrefix}/sign-parts`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				key: storageKey,
+				upload_id,
+				part_numbers: [part]
+			})
+		});
+		if (!signRes.ok) {
+			// Attempt to clean up on failure.
+			await fetch(`${apiPrefix}/abort-upload`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ key: storageKey, upload_id })
+			});
+			throw new Error(
+				`sign-parts failed for part ${part}: ${signRes.status} ${signRes.statusText}`
+			);
+		}
+		const urls = await signRes.json();
+		const url = urls[0]?.url;
+		if (!url) {
+			await fetch(`${apiPrefix}/abort-upload`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ key: storageKey, upload_id })
+			});
+			throw new Error(`sign-parts returned no URL for part ${part}`);
+		}
+		const uploadRes = await fetch(url, {
+			method: 'PUT',
+			body: payload
+		});
+		if (!uploadRes.ok) {
+			await fetch(`${apiPrefix}/abort-upload`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ key: storageKey, upload_id })
+			});
+			throw new Error(`part ${part} upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
+		}
+		parts.push({
+			part_number: part,
+			etag: uploadRes.headers.get('ETag')
+		});
+		onProgress?.(0.05 + 0.9 * (part / totalChunks));
+		part++;
+	}
+	const completeRes = await fetch(`${apiPrefix}/complete-upload`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			key: storageKey,
+			upload_id,
+			parts
+		})
+	});
+	if (!completeRes.ok) {
+		await fetch(`${apiPrefix}/abort-upload`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ key: storageKey, upload_id })
+		});
+		throw new Error(`complete-upload failed: ${completeRes.status} ${completeRes.statusText}`);
+	}
+	onProgress?.(1);
+	return { raw, fileId };
 }
 //# sourceMappingURL=upload.js.map

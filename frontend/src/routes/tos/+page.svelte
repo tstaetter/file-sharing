@@ -7,26 +7,26 @@
 </script>
 
 <svelte:head>
-	<title>Terms of Service — sha.zone</title>
+	<title>Terms of Service — filez.zone</title>
 	<meta
 		name="description"
-		content="Terms of Service for sha.zone. Learn about the terms governing our end-to-end encrypted file sharing service, including user responsibilities, data retention, and acceptable use."
+		content="Terms of Service for filez.zone. Learn about the terms governing our end-to-end encrypted file sharing service, including user responsibilities, data retention, and acceptable use."
 	/>
 	<meta name="robots" content="index, follow" />
-	<meta property="og:title" content="Terms of Service — sha.zone" />
+	<meta property="og:title" content="Terms of Service — filez.zone" />
 	<meta
 		property="og:description"
-		content="Terms of Service for sha.zone. Learn about the terms governing our end-to-end encrypted file sharing service."
+		content="Terms of Service for filez.zone. Learn about the terms governing our end-to-end encrypted file sharing service."
 	/>
-	<meta property="og:url" content="https://sha.zone/tos" />
+	<meta property="og:url" content="https://filez.zone/tos" />
 	<meta property="og:type" content="website" />
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="Terms of Service — sha.zone" />
+	<meta name="twitter:title" content="Terms of Service — filez.zone" />
 	<meta
 		name="twitter:description"
-		content="Terms of Service for sha.zone end-to-end encrypted file sharing."
+		content="Terms of Service for filez.zone end-to-end encrypted file sharing."
 	/>
-	<link rel="canonical" href="https://sha.zone/tos" />
+	<link rel="canonical" href="https://filez.zone/tos" />
 </svelte:head>
 
 <div class="w-full max-w-2xl">
@@ -40,16 +40,16 @@
 			<section>
 				<h2 class="text-base font-semibold text-slate-800 mb-2">1. Acceptance of Terms</h2>
 				<p>
-					By accessing or using the sha.zone file-sharing service ("Service"), you agree to be bound
-					by these Terms of Service ("Terms"). If you do not agree to all of these Terms, do not use
-					the Service.
+					By accessing or using the filez.zone file-sharing service ("Service"), you agree to be
+					bound by these Terms of Service ("Terms"). If you do not agree to all of these Terms, do
+					not use the Service.
 				</p>
 			</section>
 
 			<section>
 				<h2 class="text-base font-semibold text-slate-800 mb-2">2. Description of Service</h2>
 				<p>
-					sha.zone provides an end-to-end encrypted file-sharing service. Files are encrypted in
+					filez.zone provides an end-to-end encrypted file-sharing service. Files are encrypted in
 					your browser before upload and can only be decrypted by recipients who possess the unique
 					link containing the encryption key. Files are automatically deleted from our servers after
 					a single download ("burn after reading").
@@ -163,8 +163,8 @@
 				<h2 class="text-base font-semibold text-slate-800 mb-2">10. Contact</h2>
 				<p>
 					If you have questions about these Terms, please reach out to us at <a
-						href="mailto:legal@sha.zone"
-						class="text-blue-500 hover:text-blue-600 underline">legal@sha.zone</a
+						href="mailto:legal@filez.zone"
+						class="text-blue-500 hover:text-blue-600 underline">legal@filez.zone</a
 					>.
 				</p>
 			</section>
@@ -172,6 +172,6 @@
 	</div>
 
 	<p class="text-center text-xs text-slate-400 mt-6">
-		<a href="/" class="text-blue-500 hover:text-blue-600 transition-colors">← Back to sha.zone</a>
+		<a href="/" class="text-blue-500 hover:text-blue-600 transition-colors">← Back to filez.zone</a>
 	</p>
 </div>

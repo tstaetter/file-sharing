@@ -39,13 +39,13 @@
 </script>
 
 <svelte:head>
-	<title>Decrypting your file — sha.zone</title>
+	<title>Decrypting your file — filez.zone</title>
 	<meta
 		name="description"
 		content="Download your encrypted file. Files are decrypted in your browser and deleted from the server after download."
 	/>
 	<meta name="robots" content="noindex, nofollow" />
-	<meta property="og:title" content="Download your file — sha.zone" />
+	<meta property="og:title" content="Download your file — filez.zone" />
 	<meta
 		property="og:description"
 		content="Download your encrypted file. Files are decrypted in your browser and deleted from the server after download."
@@ -57,7 +57,7 @@
 	<div class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-8">
 		<!-- Logo -->
 		<div class="mx-auto w-14 h-14 rounded-xl overflow-hidden mb-6 shadow-md shadow-cyan-200/50">
-			<img src={logo} alt="sha.zone" class="w-full h-full object-cover" />
+			<img src={logo} alt="filez.zone" class="w-full h-full object-cover" />
 		</div>
 
 		<h1 class="text-2xl font-semibold text-slate-800 text-center mb-6">Decrypting your file</h1>
