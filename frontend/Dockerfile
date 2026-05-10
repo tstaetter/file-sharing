@@ -33,7 +33,7 @@ COPY . .
 ARG PUBLIC_API_PREFIX=https://spare-lucine-unartig-a663d382.koyeb.app/v1
 ENV PUBLIC_API_PREFIX=$PUBLIC_API_PREFIX
 
-ARG PUBLIC_PREFIX
+ARG PUBLIC_PREFIX=https://damaged-debby-unartig-2b50a1f9.koyeb.app
 ENV PUBLIC_PREFIX=$PUBLIC_PREFIX
 
 # Build the SvelteKit app for production.
