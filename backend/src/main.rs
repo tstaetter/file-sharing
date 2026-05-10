@@ -84,7 +84,9 @@ async fn main() {
 
     let state = AppState { s3, bucket };
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000")
+    let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());
+    info!("Starting server on port {}", port);
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
         .await
         .expect("failed to bind TCP listener");
 

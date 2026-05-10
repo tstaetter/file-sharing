@@ -1,6 +1,6 @@
-use crate::{AppState, abort_upload, complete_upload, create_upload, download, sign_parts};
+use crate::{abort_upload, complete_upload, create_upload, download, health, sign_parts, AppState};
 use axum::routing::get;
-use axum::{Router, routing::post};
+use axum::{routing::post, Router};
 use tower_http::cors::CorsLayer;
 
 pub fn app(state: AppState) -> Router {
@@ -13,5 +13,7 @@ pub fn app(state: AppState) -> Router {
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    Router::new().nest("/v1", routes)
+    Router::new()
+        .route("/health", get(health))
+        .nest("/v1", routes)
 }
