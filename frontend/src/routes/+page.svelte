@@ -90,10 +90,12 @@
 
 		<!-- File input area -->
 		<label
-			class="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200
-					{file
-				? 'border-violet-300 bg-violet-50/50'
-				: 'border-slate-200 bg-slate-50/50 hover:border-slate-300 hover:bg-slate-100/50'}"
+			class="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-xl transition-all duration-200
+					{uploading
+				? 'border-slate-200 bg-slate-50/50 opacity-50 cursor-not-allowed'
+				: file
+					? 'border-violet-300 bg-violet-50/50 cursor-pointer'
+					: 'border-slate-200 bg-slate-50/50 cursor-pointer hover:border-slate-300 hover:bg-slate-100/50'}"
 		>
 			<div class="flex flex-col items-center gap-2">
 				{#if fileName}
@@ -128,7 +130,7 @@
 					<span class="text-xs text-slate-400">or drag and drop</span>
 				{/if}
 			</div>
-			<input type="file" onchange={handleFile} class="hidden" />
+			<input type="file" onchange={handleFile} class="hidden" disabled={uploading} />
 		</label>
 
 		<!-- Upload button -->
