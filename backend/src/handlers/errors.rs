@@ -29,7 +29,22 @@ pub enum AbortUploadError {
     Sdk(String),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum CompleteUploadError {
+    #[error("SDK error: {0}")]
+    Sdk(String),
+}
+
 impl IntoResponse for AbortUploadError {
+    fn into_response(self) -> Response {
+        let status = match &self {
+            Self::Sdk(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        (status, self.to_string()).into_response()
+    }
+}
+
+impl IntoResponse for CompleteUploadError {
     fn into_response(self) -> Response {
         let status = match &self {
             Self::Sdk(_) => StatusCode::INTERNAL_SERVER_ERROR,

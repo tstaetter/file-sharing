@@ -1,7 +1,9 @@
+use crate::handlers::errors::CompleteUploadError;
 use crate::AppState;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
-use axum::Json;
 use axum::extract::State;
+use axum::response::IntoResponse;
+use axum::Json;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -17,7 +19,10 @@ struct PartETag {
     etag: String,
 }
 
-pub async fn complete_upload(State(state): State<AppState>, Json(req): Json<CompleteRequest>) {
+pub async fn complete_upload(
+    State(state): State<AppState>,
+    Json(req): Json<CompleteRequest>,
+) -> Result<impl IntoResponse, CompleteUploadError> {
     let completed_parts = req
         .parts
         .into_iter()
@@ -42,5 +47,7 @@ pub async fn complete_upload(State(state): State<AppState>, Json(req): Json<Comp
         .multipart_upload(upload)
         .send()
         .await
-        .unwrap();
+        .map_err(|e| CompleteUploadError::Sdk(e.to_string()))?;
+
+    Ok(())
 }

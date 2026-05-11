@@ -1,4 +1,4 @@
-use crate::handlers::errors::{AbortUploadError, DownloadError};
+use crate::handlers::errors::AbortUploadError;
 use crate::AppState;
 use axum::extract::State;
 use axum::response::IntoResponse;
