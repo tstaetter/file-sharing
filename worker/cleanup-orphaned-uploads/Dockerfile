@@ -78,11 +78,11 @@ RUN apt-get update && \
 COPY --from=builder /usr/local/bin/cleanup-orphaned-uploads /usr/local/bin/cleanup-orphaned-uploads
 
 # Create the crontab file that Supercronic will read.
-# Runs every 5 minutes.
+# Runs every 6 hours at minute 0 (00:00, 06:00, 12:00, 18:00 UTC).
 # The worker reads RUST_LOG from the environment; set RUST_LOG=info on
 # Koyeb to see progress output for each run.
 COPY --chown=app:app <<CRONTAB /etc/crontab
-*/5 * * * * /usr/local/bin/cleanup-orphaned-uploads
+0 */6 * * * /usr/local/bin/cleanup-orphaned-uploads
 CRONTAB
 
 # OCI labels for container metadata
