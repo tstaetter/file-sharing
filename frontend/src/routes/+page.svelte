@@ -206,6 +206,10 @@
 				<p class="text-xs text-cyan-600 mt-2">
 					The recipient just opens this link — the key is in the URL.
 				</p>
+				<p class="text-xs text-red-600 mt-2">
+					<span class="font-bold">ATTENTION:</span> Once you open the URL, the file gets deleted from
+					the server (burn after reading)!
+				</p>
 			</div>
 		{/if}
 	</div>
