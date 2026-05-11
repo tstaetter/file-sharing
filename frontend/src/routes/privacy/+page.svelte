@@ -10,13 +10,13 @@
 	<title>Privacy Policy — filez.zone</title>
 	<meta
 		name="description"
-		content="Privacy Policy for filez.zone. Learn how we handle your data, including end-to-end encryption, burn-after-reading file deletion, and our commitment to zero tracking."
+		content="Privacy Policy for filez.zone. Learn how we handle your data, including end-to-end encryption, burn-after-reading file deletion, and our use of cookieless, privacy-first analytics."
 	/>
 	<meta name="robots" content="index, follow" />
 	<meta property="og:title" content="Privacy Policy — filez.zone" />
 	<meta
 		property="og:description"
-		content="Privacy Policy for filez.zone. End-to-end encrypted file sharing with zero tracking and automatic file deletion after download."
+		content="Privacy Policy for filez.zone. End-to-end encrypted file sharing with cookieless, privacy-first analytics and automatic file deletion after download."
 	/>
 	<meta property="og:url" content="https://filez.zone/privacy" />
 	<meta property="og:type" content="website" />
@@ -24,7 +24,7 @@
 	<meta name="twitter:title" content="Privacy Policy — filez.zone" />
 	<meta
 		name="twitter:description"
-		content="Privacy Policy for filez.zone. Learn how we protect your data with end-to-end encryption and automatic deletion."
+		content="Privacy Policy for filez.zone. Learn how we protect your data with end-to-end encryption, cookieless analytics, and automatic deletion."
 	/>
 	<link rel="canonical" href="https://filez.zone/privacy" />
 </svelte:head>
@@ -77,6 +77,13 @@
 						<strong>Server logs:</strong> We may log HTTP request metadata (IP address, timestamp, user
 						agent) for operational purposes such as debugging, rate limiting, and abuse prevention. These
 						logs are retained temporarily and are not used to build user profiles.
+					</li>
+					<li>
+						<strong>Anonymous analytics:</strong> We use OpenPanel, a cookieless, privacy-first analytics
+						tool, to collect anonymous page view data. This includes page URLs, referrer information,
+						browser and device type, and country-level location derived from anonymized IP addresses.
+						No cookies are used, no personal identifiers are collected, and users cannot be tracked across
+						sessions or websites.
 					</li>
 				</ul>
 
@@ -158,13 +165,28 @@
 					>). Cloudflare does not have access to your encryption keys or the ability to decrypt your
 					files.
 				</p>
+				<p class="mt-2">
+					We use <strong>OpenPanel</strong>, a self-hosted, cookieless analytics tool, to understand
+					how our Service is used. OpenPanel collects anonymous page view data without cookies or
+					personal identifiers. It is deployed on our own infrastructure and data is not shared with
+					any external analytics provider. For more details, see the
+					<a
+						href="https://openpanel.dev"
+						class="text-blue-500 hover:text-blue-600 underline"
+						target="_blank"
+						rel="noopener">OpenPanel documentation</a
+					>.
+				</p>
 			</section>
 
 			<section>
-				<h2 class="text-base font-semibold text-slate-800 mb-2">6. Cookies</h2>
+				<h2 class="text-base font-semibold text-slate-800 mb-2">6. Cookies &amp; Tracking</h2>
 				<p>
-					filez.zone does not use cookies for tracking, advertising, or analytics. For details about
-					the minimal browser storage we use, see our <a
+					filez.zone does not use cookies for tracking, advertising, or analytics. Our analytics
+					tool (OpenPanel) operates entirely without cookies — it does not set, read, or require any
+					cookies in your browser. It uses server-side request analysis to count page views
+					anonymously, without storing any identifiers on your device. For details about the minimal
+					browser storage we use for the Service itself, see our <a
 						href="/cookies"
 						class="text-blue-500 hover:text-blue-600 underline">Cookie Policy</a
 					>.
