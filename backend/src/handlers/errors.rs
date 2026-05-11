@@ -25,14 +25,29 @@ pub enum DownloadError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum AbortUploadError {
-    #[error("SDK error: {0}")]
+    #[error("AbortUpload SDK error: {0}")]
     Sdk(String),
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum CompleteUploadError {
-    #[error("SDK error: {0}")]
+    #[error("CompleteUpload SDK error: {0}")]
     Sdk(String),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SignPartsError {
+    #[error("SignParts SDK error: {0}")]
+    Sdk(String),
+}
+
+impl IntoResponse for SignPartsError {
+    fn into_response(self) -> Response {
+        let status = match &self {
+            Self::Sdk(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        (status, self.to_string()).into_response()
+    }
 }
 
 impl IntoResponse for AbortUploadError {
