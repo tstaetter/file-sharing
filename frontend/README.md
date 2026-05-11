@@ -86,6 +86,17 @@ Test files live next to the modules they exercise (e.g., `src/lib/crypto.test.ts
 3. The blob is split back into per-chunk `IV + ciphertext` segments and decrypted with the Web Crypto API.
 4. Plaintext chunks are assembled into a Blob and triggered as a browser download.
 
+### Zero-Knowledge Architecture
+
+filez.zone implements a **zero-knowledge** encryption model — the server has no technical ability to access your plaintext or encryption keys. Read the full explanation on the [Zero-Knowledge Encryption](https://filez.zone/zero-knowledge) page, or inspect the source code in this repository.
+
+Key properties:
+
+- **Client-side encryption:** All cryptographic operations happen in the browser via the Web Crypto API. The original file never leaves your device.
+- **Hash fragment key exchange:** The encryption key is embedded in the URL hash fragment (`#key`), which browsers never transmit in HTTP requests. The server physically cannot receive it.
+- **Direct-to-storage uploads:** Encrypted chunks are PUT directly to Cloudflare R2 via presigned URLs. File data never passes through the backend.
+- **Burn after reading:** Files are permanently deleted from R2 after the first download. There is no second chance.
+
 ### Encryption Model
 
 - **Algorithm:** AES-256-GCM.
@@ -109,12 +120,55 @@ src/
 │   └── assets/
 │       └── favicon.svg
 └── routes/
-    ├── +layout.svelte       ← root layout (favicon, global CSS)
+    ├── +layout.svelte       ← root layout (header nav, footer, global CSS)
     ├── +page.svelte         ← upload page (file picker, encrypt & upload)
-    └── f/
-        └── [id]/
-            └── +page.svelte ← download page (fetch, decrypt, save)
+    ├── f/
+    │   └── [id]/
+    │       └── +page.svelte ← download page (fetch, decrypt, save)
+    ├── health/
+    │   └── +server.ts       ← health check endpoint (GET /health → {"status":"ok"})
+    ├── zero-knowledge/
+    │   └── +page.svelte     ← zero-knowledge architecture explanation
+    ├── privacy/
+    │   └── +page.svelte     ← privacy policy
+    ├── cookies/
+    │   └── +page.svelte     ← cookie policy
+    ├── tos/
+    │   └── +page.svelte     ← terms of service
+    └── sitemap.xml/
+        └── +server.ts       ← dynamic sitemap generation
 ```
+
+## Pages
+
+| Route | Description |
+|---|---|
+| `/` | Upload page — pick a file, encrypt, and upload with progress bar |
+| `/f/[id]` | Download page — decrypt and save file after burn-after-read fetch |
+| `/health` | Koyeb health check — returns `{"status":"ok"}` with HTTP 200 |
+| `/zero-knowledge` | Educational page explaining zero-knowledge encryption architecture |
+| `/privacy` | Privacy policy — data collection, encryption, third-party services |
+| `/cookies` | Cookie policy — minimal browser storage, cookieless analytics |
+| `/tos` | Terms of service |
+
+## Analytics
+
+We use [OpenPanel](https://openpanel.dev), a self-hosted, **cookieless** analytics tool. It collects anonymous page view data (page URLs, referrer, browser type, country-level location) without cookies, without personal identifiers, and without cross-session tracking. No data is shared with external analytics providers. See the [Privacy Policy](https://filez.zone/privacy) for full details.
+
+## Deployment
+
+The frontend is deployed on [Koyeb](https://www.koyeb.com/) as a Web Service. The `Dockerfile` uses a multi-stage build:
+
+1. **Builder stage:** `node:22-slim` — installs dependencies, builds the SvelteKit app with `adapter-node`
+2. **Runtime stage:** `node:22-slim` — copies only the self-contained `build/` output, runs with `tini` as init
+
+Key deployment configuration:
+
+- **Service type:** Web Service
+- **Build arg:** `PUBLIC_API_PREFIX` — the backend API URL, baked into the client bundle at build time
+- **Environment variables:** `ORIGIN` — set to the public URL (e.g. `https://filez.zone`) to prevent host-header spoofing
+- **PORT:** Automatically set by Koyeb; adapter-node reads it at runtime
+- **Health check:** Koyeb performs TCP health checks by default; configure an HTTP check to `/health` for faster failure detection
 
 ## Tech Stack
 
@@ -129,5 +183,7 @@ src/
 | Testing         | [Vitest](https://vitest.dev/)                       |
 | Linting         | [ESLint 10](https://eslint.org/) + typescript-eslint |
 | Formatting      | [Prettier 3](https://prettier.io/) + prettier-plugin-svelte |
+| Analytics       | [OpenPanel](https://openpanel.dev) (self-hosted, cookieless) |
+| Deployment      | [Koyeb](https://www.koyeb.com/)                     |
 
 See [AGENTS.md](AGENTS.md) for detailed conventions, design decisions, and agent guidance.

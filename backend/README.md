@@ -2,7 +2,7 @@
 
 Backend API for the file-sharing service. Built with **Rust** and **Axum**, it generates presigned URLs for multipart uploads directly to Cloudflare R2 and serves encrypted blobs with self-destructing ("burn after reading") downloads.
 
-The backend never sees plaintext — all encryption and decryption happens client-side in the browser.
+The backend never sees plaintext — all encryption and decryption happens client-side in the browser. It stores and serves opaque ciphertext only.
 
 ## Quick Start
 
@@ -35,19 +35,31 @@ RUST_LOG=info,backend=debug
 cargo run
 ```
 
-The server starts on **`http://0.0.0.0:8000`**. On startup it applies a CORS policy to the R2 bucket (logged as a warning if permissions are insufficient).
+The server starts on **`http://0.0.0.0:8000`** by default. If the `PORT` environment variable is set (as on Koyeb), the server listens on that port instead. On startup it applies a CORS policy to the R2 bucket (logged as a warning if permissions are insufficient).
 
 ## API Endpoints
 
-All endpoints accept and return JSON.
+All endpoints accept and return JSON unless otherwise noted.
 
-| Method | Path               | Purpose                                                  |
-|--------|--------------------|----------------------------------------------------------|
-| POST   | `/v1/create-upload`   | Initiate a multipart upload. Returns `upload_id` and key. |
-| POST   | `/v1/sign-parts`      | Generate presigned URLs for part numbers (valid 1 hour).  |
-| POST   | `/v1/complete-upload` | Finalise multipart upload with ETags.                     |
-| POST   | `/v1/abort-upload`    | Cancel an in-progress multipart upload.                   |
-| GET    | `/v1/f/:id`           | Download encrypted blob. **Deletes object from R2 after reading.** |
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | Health check — returns `{"status":"ok"}` with HTTP 200 |
+| POST | `/v1/create-upload` | Initiate a multipart upload. Returns `upload_id` and key. |
+| POST | `/v1/sign-parts` | Generate presigned URLs for part numbers (valid 1 hour). |
+| POST | `/v1/complete-upload` | Finalise multipart upload with ETags. |
+| POST | `/v1/abort-upload` | Cancel an in-progress multipart upload. |
+| GET | `/v1/f/:id` | Download encrypted blob. **Deletes object from R2 after reading.** |
+
+The `/health` endpoint is used by Koyeb (and other orchestrators) to determine if the service is healthy. It runs outside the `/v1` prefix and does not require CORS.
+
+The `GET /v1/f/:id` endpoint returns the raw binary ciphertext stream directly (not JSON). Metadata such as the original content type and chunk size is sent in response headers (`X-Content-Type`, `X-Chunk-Size`).
+
+### Example: Health Check
+
+```bash
+curl http://localhost:8000/health
+# → {"status":"ok"}
+```
 
 ### Example: Create Upload
 
@@ -68,10 +80,10 @@ curl -X POST http://localhost:8000/v1/sign-parts \
 ### Example: Download
 
 ```bash
-curl http://localhost:8000/v1/f/abc123
+curl http://localhost:8000/v1/f/abc123 --output file.enc
 ```
 
-Returns a JSON object with base64-encoded `data`, a `nonce`, and the original `content_type`.
+Returns the raw encrypted binary stream. The file is permanently deleted from R2 immediately after this request succeeds. Any subsequent request returns 404.
 
 ## Testing
 
@@ -90,27 +102,47 @@ cargo nextest run -- --nocapture
 
 ```
 src/
-├── main.rs        → tracing, S3 client, CORS policy, server startup
+├── main.rs        → tracing, S3 client, CORS policy (background), PORT binding, graceful shutdown
 ├── lib.rs         → AppState, re-exports
-├── routes.rs      → Axum router definition
+├── routes.rs      → Axum router definition (/health + /v1/*)
 └── handlers/
-    ├── create_upload.rs
-    ├── sign_parts.rs
-    ├── complete_upload.rs
-    ├── abort_upload.rs
-    └── download.rs
+    ├── health.rs          → GET /health — orchestrator health check
+    ├── create_upload.rs   → POST /v1/create-upload
+    ├── sign_parts.rs      → POST /v1/sign-parts
+    ├── complete_upload.rs → POST /v1/complete-upload
+    ├── abort_upload.rs    → POST /v1/abort-upload
+    └── download.rs        → GET /v1/f/:id — burn-after-read download
 ```
+
+## Deployment
+
+The backend is deployed on [Koyeb](https://www.koyeb.com/) as a Web Service. The `Dockerfile` uses a multi-stage build:
+
+1. **Builder stage:** `rust:1-slim-bookworm` — compiles dependencies first (cached), then builds the real binary with fingerprint cleanup to avoid stale-library errors.
+2. **Runtime stage:** `debian:bookworm-slim` — copies only the compiled binary, runs with `tini` as init for proper signal forwarding.
+
+Key deployment configuration:
+
+- **Service type:** Web Service (not Worker — this is an HTTP API)
+- **Environment variables (secrets):** `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
+- **PORT:** Automatically set by Koyeb; the app reads it at runtime with a fallback to `8000`
+- **Health check:** Koyeb performs TCP health checks by default; configure an HTTP check to `/health` for faster failure detection
+- **Graceful shutdown:** Handles SIGTERM (Koyeb) and SIGINT (local Ctrl+C) via `axum::serve().with_graceful_shutdown()`
+- **CORS setup:** Runs in a background `tokio::spawn` task so it never blocks startup or causes Koyeb's startup timeout to trigger
+- **Logging:** Defaults to `RUST_LOG=info` if not set, writes to stdout, disables ANSI colors in Docker (no TTY)
 
 ## Tech Stack
 
-| Component   | Crate                       |
-|-------------|-----------------------------|
-| Framework   | `axum` 0.8                 |
-| Async       | `tokio` (full features)     |
-| Storage     | `aws-sdk-s3` (Cloudflare R2) |
-| Logging     | `tracing` + `tracing-subscriber` |
-| CORS        | `tower-http`                |
-| Serialization | `serde` + `serde_json`    |
-| Env vars    | `dotenvy`                   |
+| Component | Crate |
+|---|---|
+| Framework | `axum` 0.8 |
+| Async | `tokio` (full features) |
+| Storage | `aws-sdk-s3` (Cloudflare R2) |
+| Logging | `tracing` + `tracing-subscriber` |
+| CORS | `tower-http` |
+| Serialization | `serde` + `serde_json` |
+| Env vars | `dotenvy` |
+| Init process | `tini` (in Docker) |
+| Deployment | `Koyeb` |
 
 See [AGENTS.md](AGENTS.md) for detailed conventions, design decisions, and agent guidance.
