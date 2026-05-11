@@ -185,7 +185,10 @@
 						class="flex-1 text-xs bg-white border border-cyan-200 rounded-lg px-3 py-2 text-slate-700 outline-none"
 					/>
 					<button
-						onclick={() => navigator.clipboard.writeText(link)}
+						onclick={() => {
+							navigator.clipboard.writeText(link);
+							alert('Copied link to clipboard');
+						}}
 						class="shrink-0 p-2 bg-white border border-cyan-200 rounded-lg text-cyan-600 hover:bg-cyan-100 transition-colors cursor-pointer"
 						title="Copy to clipboard"
 					>
@@ -209,7 +212,11 @@
 					The recipient just opens this link — the key is in the URL.
 				</p>
 				<p class="text-xs text-red-600 mt-2">
-					Share this <span class="font-bold underline">one-time</span> link
+					Share this <span
+						class="font-bold underline"
+						title="The file is deleted from the server after the first download (burn after reading)"
+						>one-time</span
+					> link
 				</p>
 			</div>
 		{/if}
