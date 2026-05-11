@@ -38,6 +38,39 @@
 <div
 	class="flex min-h-screen flex-col bg-gradient-to-br from-slate-50 via-white to-violet-50 font-sans"
 >
+	<!-- Header navigation -->
+	<header class="border-b border-slate-200/60 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+		<div class="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
+			<a href="/" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+				<div class="w-7 h-7 rounded-lg overflow-hidden shadow-sm shadow-violet-200/50">
+					<img src="/logo.webp" alt="filez.zone" class="w-full h-full object-cover" />
+				</div>
+				<span class="text-sm font-semibold text-slate-800">filez.zone</span>
+			</a>
+
+			<nav class="flex items-center gap-1">
+				<a
+					href="/"
+					class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+				>
+					Home
+				</a>
+				<a
+					href="/zero-knowledge"
+					class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+				>
+					Zero Knowledge
+				</a>
+				<a
+					href="/privacy"
+					class="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors hidden sm:inline-block"
+				>
+					Privacy
+				</a>
+			</nav>
+		</div>
+	</header>
+
 	<main class="flex flex-1 items-center justify-center p-4">
 		{@render children()}
 	</main>
@@ -48,6 +81,7 @@
 		>
 			<span>&copy; {currentYear} filez.zone</span>
 			<nav class="flex gap-4">
+				<a href="/zero-knowledge" class="hover:text-slate-600 transition-colors">Zero Knowledge</a>
 				<a href="/tos" class="hover:text-slate-600 transition-colors">Terms of Service</a>
 				<a href="/privacy" class="hover:text-slate-600 transition-colors">Privacy Policy</a>
 				<a href="/cookies" class="hover:text-slate-600 transition-colors">Cookie Policy</a>
