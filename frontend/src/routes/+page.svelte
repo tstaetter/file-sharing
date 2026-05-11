@@ -212,11 +212,11 @@
 					The recipient just opens this link — the key is in the URL.
 				</p>
 				<p class="text-xs text-red-600 mt-2">
-					Share this <span
+					<span
 						class="font-bold underline"
-						title="The file is deleted from the server after the first download (burn after reading)"
-						>one-time</span
-					> link
+						title="The file is deleted after opening the shared link (burn after reading)"
+						>ATTENTION:</span
+					> Once the link is opened, the file gets deleted from our servers
 				</p>
 			</div>
 		{/if}
