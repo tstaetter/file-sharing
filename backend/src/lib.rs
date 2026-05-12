@@ -12,4 +12,5 @@ use aws_sdk_s3::Client;
 pub struct AppState {
     pub s3: Client,
     pub bucket: String,
+    pub database: Option<mongodb::Database>,
 }

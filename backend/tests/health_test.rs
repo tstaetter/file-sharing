@@ -25,6 +25,7 @@ fn test_state() -> backend::AppState {
     let client = aws_sdk_s3::Client::from_conf(config);
 
     backend::AppState {
+        database: None,
         s3: client,
         bucket: "test-bucket".to_string(),
     }

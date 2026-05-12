@@ -18,6 +18,7 @@ async fn test_create_upload_without_content_type() {
     let s3 = mock_client!(aws_sdk_s3, [&rule]);
 
     let state = AppState {
+        database: None,
         s3,
         bucket: "test-bucket".to_string(),
     };
@@ -58,6 +59,7 @@ async fn test_create_upload_with_content_type() {
     let s3 = mock_client!(aws_sdk_s3, [&rule]);
 
     let state = AppState {
+        database: None,
         s3,
         bucket: "test-bucket".to_string(),
     };

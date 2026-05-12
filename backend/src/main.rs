@@ -118,7 +118,7 @@ async fn main() {
         }
     });
 
-    let state = AppState { s3, bucket };
+    let state = AppState { s3, bucket, database: None };
 
     // Koyeb sets PORT at runtime; fall back to 8000 for local dev
     let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());

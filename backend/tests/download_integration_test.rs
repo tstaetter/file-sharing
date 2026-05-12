@@ -31,6 +31,7 @@ async fn test_download_happy_path() {
     let s3 = mock_client!(aws_sdk_s3, [&get_rule, &delete_rule]);
 
     let state = AppState {
+        database: None,
         s3,
         bucket: "test-bucket".to_string(),
     };
@@ -83,6 +84,7 @@ async fn test_download_with_chunk_size_metadata() {
     let s3 = mock_client!(aws_sdk_s3, [&get_rule, &delete_rule]);
 
     let state = AppState {
+        database: None,
         s3,
         bucket: "test-bucket".to_string(),
     };
@@ -123,6 +125,7 @@ async fn test_download_not_found() {
     let s3 = mock_client!(aws_sdk_s3, [&get_rule]);
 
     let state = AppState {
+        database: None,
         s3,
         bucket: "test-bucket".to_string(),
     };

@@ -23,6 +23,7 @@ async fn test_sign_parts_multiple() {
     let s3 = test_s3_client();
 
     let state = AppState {
+        database: None,
         s3,
         bucket: "test-bucket".to_string(),
     };
@@ -94,6 +95,7 @@ async fn test_sign_parts_single() {
     let s3 = test_s3_client();
 
     let state = AppState {
+        database: None,
         s3,
         bucket: "test-bucket".to_string(),
     };
