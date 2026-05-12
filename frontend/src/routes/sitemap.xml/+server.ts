@@ -6,7 +6,8 @@ const staticPages: { path: string; changefreq: string; priority: string }[] = [
 	{ path: '/', changefreq: 'weekly', priority: '1.0' },
 	{ path: '/tos', changefreq: 'monthly', priority: '0.3' },
 	{ path: '/privacy', changefreq: 'monthly', priority: '0.3' },
-	{ path: '/cookies', changefreq: 'monthly', priority: '0.3' }
+	{ path: '/cookies', changefreq: 'monthly', priority: '0.3' },
+	{ path: '/zero-knowledge', changefreq: 'monthly', priority: '0.3' }
 ];
 
 function escapeXml(str: string): string {
