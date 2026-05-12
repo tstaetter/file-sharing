@@ -6,17 +6,17 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct CompleteRequest {
-    key: String,
-    upload_id: String,
-    parts: Vec<PartETag>,
+    pub key: String,
+    pub upload_id: String,
+    pub parts: Vec<PartETag>,
 }
 
-#[derive(Deserialize)]
-struct PartETag {
-    part_number: i32,
-    etag: String,
+#[derive(Debug, Deserialize)]
+pub struct PartETag {
+    pub part_number: i32,
+    pub etag: String,
 }
 
 pub async fn complete_upload(

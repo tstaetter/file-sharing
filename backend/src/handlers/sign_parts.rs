@@ -5,17 +5,17 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct SignPartsRequest {
-    key: String,
-    upload_id: String,
-    part_numbers: Vec<i32>,
+    pub key: String,
+    pub upload_id: String,
+    pub part_numbers: Vec<i32>,
 }
 
 #[derive(Serialize)]
 pub struct SignedPart {
-    part_number: i32,
-    url: String,
+    pub part_number: i32,
+    pub url: String,
 }
 
 pub async fn sign_parts(

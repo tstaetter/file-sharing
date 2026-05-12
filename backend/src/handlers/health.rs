@@ -3,7 +3,7 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct HealthResponse {
-    status: &'static str,
+    pub status: &'static str,
 }
 
 /// Health check endpoint for Koyeb and other orchestrators.

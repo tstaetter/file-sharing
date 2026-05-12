@@ -5,10 +5,10 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct AbortRequest {
-    key: String,
-    upload_id: String,
+    pub key: String,
+    pub upload_id: String,
 }
 
 pub async fn abort_upload(
