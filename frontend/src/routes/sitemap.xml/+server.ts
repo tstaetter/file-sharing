@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 
-const BASE_URL = 'https://filez.zone';
+const BASE_URL = 'https://www.filez.zone';
 
 const staticPages: { path: string; changefreq: string; priority: string }[] = [
 	{ path: '/', changefreq: 'weekly', priority: '1.0' },
