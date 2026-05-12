@@ -123,10 +123,11 @@ async fn main() -> anyhow::Result<()> {
     // Database setup
     let mongo_uri =
         std::env::var("MONGODB_URI").unwrap_or_else(|_| "mongodb://localhost:27017".to_string());
+    let mongo_db = std::env::var("MONGODB_NAME").unwrap_or_else(|_| "filez_zone_dev".to_string());
     let client = MongoClient::with_uri_str(&mongo_uri)
         .await
         .context("Failed to connect to MongoDB")?;
-    let database = Some(client.database("filez_zone_dev"));
+    let database = Some(client.database(&mongo_db));
 
     info!("Connected to MongoDB on {}", mongo_uri);
 
