@@ -82,7 +82,7 @@
 			<span>&copy; {currentYear} filez.zone</span>
 			<nav class="flex gap-4 items-center">
 				<a
-					href="https://github.com/sha-zone/file-sharing"
+					href="https://github.com/tstaetter/file-sharing"
 					target="_blank"
 					rel="noopener noreferrer"
 					class="hover:text-slate-600 transition-colors inline-flex items-center gap-1.5"
