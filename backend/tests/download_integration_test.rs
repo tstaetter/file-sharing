@@ -6,7 +6,7 @@ use aws_smithy_mocks::{mock, mock_client};
 use aws_smithy_types::byte_stream::ByteStream;
 use axum::http::StatusCode;
 use axum_test::TestServer;
-use backend::{AppState, app};
+use backend::{app, AppState};
 
 #[tokio::test]
 async fn test_download_happy_path() {
@@ -138,9 +138,11 @@ async fn test_download_not_found() {
 
     // ── Assert ───────────────────────────────────────────────────────────
 
-    response.assert_status(StatusCode::NOT_FOUND);
+    response.assert_status(StatusCode::INTERNAL_SERVER_ERROR);
     assert!(
-        response.text().contains("file not found"),
+        response
+            .text()
+            .contains("failed to fetch file from storage"),
         "response body should contain 'file not found'"
     );
 

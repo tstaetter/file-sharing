@@ -27,7 +27,7 @@ futures = "0.3"
 uuid = { version = "1", features = ["v4"] }
 bcrypt = "0.19.1"
 chrono = { version = "0.4.44", features = ["serde"] }
-jsonwebtoken = { version = "9", features = ["use_pem"] }
+jsonwebtoken = { version = "10", features = ["aws_lc_rs"] }
 
 [dev-dependencies]
 tower = "0.5"
