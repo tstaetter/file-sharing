@@ -71,6 +71,37 @@ pub enum AuthError {
     Database(String),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum SavedUrlError {
+    #[error("invalid or expired token: {0}")]
+    InvalidToken(String),
+
+    #[error("url cannot be empty")]
+    EmptyUrl,
+
+    #[error("database error: {0}")]
+    Database(String),
+
+    #[error("page must be at least 1")]
+    InvalidPage,
+
+    #[error("per_page must be between 1 and 100")]
+    InvalidPerPage,
+}
+
+impl IntoResponse for SavedUrlError {
+    fn into_response(self) -> Response {
+        let status = match &self {
+            Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
+            Self::EmptyUrl => StatusCode::BAD_REQUEST,
+            Self::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::InvalidPage => StatusCode::BAD_REQUEST,
+            Self::InvalidPerPage => StatusCode::BAD_REQUEST,
+        };
+        (status, self.to_string()).into_response()
+    }
+}
+
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         let status = match &self {
