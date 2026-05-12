@@ -11,7 +11,7 @@ End-to-end encrypted file sharing with burn-after-reading downloads. Pick a file
 2. **Recipient** opens the link. The browser downloads the encrypted blob, decrypts it locally using the key from the URL hash, and saves the plaintext. The file is **deleted from R2 immediately** after the first download.
 3. **The server has zero knowledge.** Hash fragments are never transmitted over HTTP. Even if our infrastructure is compromised, your data remains unreadable.
 
-Read more on our [Zero-Knowledge Encryption](https://filez.zone/zero-knowledge) page.
+Read more on our [Zero-Knowledge Encryption](https://www.filez.zone/zero-knowledge) page.
 
 ```
 Browser (encrypt)  ──►  Backend (presigned URLs)  ──►  Cloudflare R2 (encrypted bytes)
@@ -103,7 +103,7 @@ For full request/response schemas and curl examples, see [backend/README.md](bac
 - **Format:** Capability URLs follow the pattern `{base}/f/{uuid}#{url-safe-base64(key)}`
 - **Zero-knowledge proof:** The server stores and serves opaque encrypted blobs — it has no technical ability to decrypt them
 
-Learn more on the [Zero-Knowledge Encryption](https://filez.zone/zero-knowledge) page.
+Learn more on the [Zero-Knowledge Encryption](https://www.filez.zone/zero-knowledge) page.
 
 ## Deployment
 
@@ -119,7 +119,7 @@ Key Koyeb environment variables for the frontend: `ORIGIN=https://your-domain.co
 
 ## Analytics
 
-We use [OpenPanel](https://openpanel.dev), a self-hosted, **cookieless** analytics tool, to collect anonymous page view data. No cookies are set, no personal identifiers are collected, and users cannot be tracked across sessions. See our [Privacy Policy](https://filez.zone/privacy) for details.
+We use [OpenPanel](https://openpanel.dev), a self-hosted, **cookieless** analytics tool, to collect anonymous page view data. No cookies are set, no personal identifiers are collected, and users cannot be tracked across sessions. See our [Privacy Policy](https://www.filez.zone/privacy) for details.
 
 ## Testing
 
@@ -140,8 +140,8 @@ cd worker/cleanup-orphaned-uploads && cargo nextest run
 - [backend/README.md](backend/README.md) — backend-specific setup, API details, and tech stack
 - [frontend/README.md](frontend/README.md) — frontend-specific setup, task reference, and how it works
 - [worker/cleanup-orphaned-uploads/README.md](worker/cleanup-orphaned-uploads/README.md) — worker-specific setup and configuration
-- [Zero-Knowledge Encryption](https://filez.zone/zero-knowledge) — how zero-knowledge architecture protects your files
-- [Privacy Policy](https://filez.zone/privacy) — how we handle your data
+- [Zero-Knowledge Encryption](https://www.filez.zone/zero-knowledge) — how zero-knowledge architecture protects your files
+- [Privacy Policy](https://www.filez.zone/privacy) — how we handle your data
 
 ## License
 
