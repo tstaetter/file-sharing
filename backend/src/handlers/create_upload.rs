@@ -1,4 +1,4 @@
-use crate::{handlers::errors::CreateUploadError, AppState};
+use crate::AppState;
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
 
@@ -18,7 +18,7 @@ pub struct CreateResponse {
 pub async fn create_upload(
     State(state): State<AppState>,
     Json(req): Json<CreateRequest>,
-) -> Result<Json<CreateResponse>, CreateUploadError> {
+) -> Json<CreateResponse> {
     let key = format!("uploads/{}", req.file_id);
 
     let mut builder = state
@@ -35,13 +35,10 @@ pub async fn create_upload(
         builder = builder.metadata("chunk-size", cs.to_string());
     }
 
-    let resp = builder
-        .send()
-        .await
-        .map_err(|e| CreateUploadError::ResponseBuilder(e.to_string()))?;
+    let resp = builder.send().await.unwrap();
 
-    Ok(Json(CreateResponse {
+    Json(CreateResponse {
         upload_id: resp.upload_id().unwrap_or_default().to_string(),
         key,
-    }))
+    })
 }
