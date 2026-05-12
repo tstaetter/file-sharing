@@ -5,8 +5,8 @@ use crate::handlers::{
 use crate::middleware::require_auth;
 use crate::AppState;
 use axum::middleware;
-use axum::routing::get;
-use axum::{routing::post, Router};
+use axum::routing::{get, post, put};
+use axum::Router;
 use tower_http::cors::CorsLayer;
 
 pub fn app(state: AppState) -> Router {
@@ -20,7 +20,7 @@ pub fn app(state: AppState) -> Router {
         .layer(middleware::from_fn(require_auth));
     let routes = Router::new()
         .route("/create-upload", post(create_upload))
-        .route("/check-file", get(check_file))
+        .route("/check-file", put(check_file))
         .route("/sign-parts", post(sign_parts))
         .route("/complete-upload", post(complete_upload))
         .route("/abort-upload", post(abort_upload))
