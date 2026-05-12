@@ -5,7 +5,7 @@ use crate::handlers::{
 use crate::middleware::require_auth;
 use crate::AppState;
 use axum::middleware;
-use axum::routing::{get, post, put};
+use axum::routing::{delete, get, post, put};
 use axum::Router;
 use tower_http::cors::CorsLayer;
 
@@ -13,10 +13,10 @@ pub fn app(state: AppState) -> Router {
     let auth_routes = Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
-        .route("/delete", post(delete_user))
         .with_state(state.clone());
     let protected_routes = Router::new()
         .route("/urls", post(save_url).get(list_urls))
+        .route("/delete", delete(delete_user))
         .layer(middleware::from_fn(require_auth));
     let routes = Router::new()
         .route("/create-upload", post(create_upload))
