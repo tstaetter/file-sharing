@@ -48,6 +48,12 @@ pub enum CreateUploadError {
 }
 
 #[derive(Debug, thiserror::Error)]
+pub enum CheckFileError {
+    #[error("CheckFile error, file not found")]
+    NotFound,
+}
+
+#[derive(Debug, thiserror::Error)]
 pub enum AuthError {
     #[error("user with this email already exists")]
     UserExists,
@@ -87,6 +93,12 @@ pub enum SavedUrlError {
 
     #[error("per_page must be between 1 and 100")]
     InvalidPerPage,
+}
+
+impl IntoResponse for CheckFileError {
+    fn into_response(self) -> Response {
+        (StatusCode::NOT_FOUND, self.to_string()).into_response()
+    }
 }
 
 impl IntoResponse for SavedUrlError {

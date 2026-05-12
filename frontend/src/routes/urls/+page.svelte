@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { auth } from '$lib/auth.svelte';
-	import { listUrls, type SavedUrlItem } from '$lib/savedUrls';
+	import { listUrls, checkFile, extractFileId, type SavedUrlItem } from '$lib/savedUrls';
 	import { goto } from '$app/navigation';
 
 	let urls = $state<SavedUrlItem[]>([]);
@@ -11,6 +12,7 @@
 	let total = $state(0);
 	let perPage = $state(10);
 	let copiedId = $state<string | null>(null);
+	let consumedIds = new SvelteSet<string>();
 
 	const totalPages = $derived(Math.max(1, Math.ceil(total / perPage)));
 
@@ -18,14 +20,38 @@
 		if (!auth.token) return;
 		loading = true;
 		error = null;
+		consumedIds.clear();
 		try {
 			const res = await listUrls(auth.token, page, perPage);
 			urls = res.urls;
 			total = res.total;
+			checkUrls();
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load saved URLs';
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function checkUrls() {
+		const checks = urls
+			.map((item) => {
+				const fileId = extractFileId(item.url);
+				return fileId ? { id: item.id, fileId } : null;
+			})
+			.filter((x): x is { id: string; fileId: string } => x !== null);
+
+		const results = await Promise.all(
+			checks.map(async ({ id, fileId }) => {
+				const exists = await checkFile(fileId);
+				return { id, exists };
+			})
+		);
+
+		for (const { id, exists } of results) {
+			if (!exists) {
+				consumedIds.add(id);
+			}
 		}
 	}
 
@@ -96,13 +122,19 @@
 
 	<!-- Loading state -->
 	{#if loading && urls.length === 0}
-		<div class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-12 text-center">
-			<div class="mx-auto w-8 h-8 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin"></div>
+		<div
+			class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-12 text-center"
+		>
+			<div
+				class="mx-auto w-8 h-8 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin"
+			></div>
 			<p class="text-sm text-slate-400 mt-4">Loading your saved URLs…</p>
 		</div>
 	{:else if error}
 		<!-- Error state -->
-		<div class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-red-100 p-8 text-center">
+		<div
+			class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-red-100 p-8 text-center"
+		>
 			<div class="mx-auto w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -130,8 +162,12 @@
 		</div>
 	{:else if urls.length === 0}
 		<!-- Empty state -->
-		<div class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-12 text-center">
-			<div class="mx-auto w-12 h-12 rounded-full bg-violet-50 flex items-center justify-center mb-4">
+		<div
+			class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-12 text-center"
+		>
+			<div
+				class="mx-auto w-12 h-12 rounded-full bg-violet-50 flex items-center justify-center mb-4"
+			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="w-6 h-6 text-violet-400"
@@ -181,28 +217,60 @@
 
 						<!-- Actions -->
 						<div class="flex items-center gap-1 shrink-0">
-							<!-- Copy button -->
-							<button
-								onclick={() => copyUrl(item.url, item.id)}
-								class="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors cursor-pointer"
-								title={copiedId === item.id ? 'Copied!' : 'Copy link'}
-							>
-								{#if copiedId === item.id}
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										class="w-4 h-4 text-violet-500"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="2"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M4.5 12.75l6 6 9-13.5"
-										/>
-									</svg>
-								{:else}
+							{#if consumedIds.has(item.id)}
+								<span
+									class="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-[10px] font-medium text-slate-400"
+								>
+									Already used
+								</span>
+							{:else}
+								<!-- Copy button -->
+								<button
+									onclick={() => copyUrl(item.url, item.id)}
+									class="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors cursor-pointer"
+									title={copiedId === item.id ? 'Copied!' : 'Copy link'}
+								>
+									{#if copiedId === item.id}
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											class="w-4 h-4 text-violet-500"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M4.5 12.75l6 6 9-13.5"
+											/>
+										</svg>
+									{:else}
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											class="w-4 h-4"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+											/>
+										</svg>
+									{/if}
+								</button>
+
+								<!-- Open link -->
+								<a
+									href={item.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+									title="Open link"
+								>
 									<svg
 										xmlns="http://www.w3.org/2000/svg"
 										class="w-4 h-4"
@@ -214,35 +282,11 @@
 										<path
 											stroke-linecap="round"
 											stroke-linejoin="round"
-											d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+											d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
 										/>
 									</svg>
-								{/if}
-							</button>
-
-							<!-- Open link -->
-							<a
-								href={item.url}
-								target="_blank"
-								rel="noopener noreferrer"
-								class="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
-								title="Open link"
-							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									class="w-4 h-4"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-									/>
-								</svg>
-							</a>
+								</a>
+							{/if}
 						</div>
 					</div>
 				</div>
@@ -257,8 +301,8 @@
 					disabled={page <= 1}
 					class="px-4 py-2 text-xs font-medium rounded-lg transition-colors cursor-pointer
 						{page > 1
-							? 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50'
-							: 'text-slate-300 bg-white border border-slate-100 cursor-not-allowed'}"
+						? 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50'
+						: 'text-slate-300 bg-white border border-slate-100 cursor-not-allowed'}"
 				>
 					← Previous
 				</button>
@@ -272,8 +316,8 @@
 					disabled={page >= totalPages}
 					class="px-4 py-2 text-xs font-medium rounded-lg transition-colors cursor-pointer
 						{page < totalPages
-							? 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50'
-							: 'text-slate-300 bg-white border border-slate-100 cursor-not-allowed'}"
+						? 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50'
+						: 'text-slate-300 bg-white border border-slate-100 cursor-not-allowed'}"
 				>
 					Next →
 				</button>
@@ -283,7 +327,9 @@
 		<!-- Loading overlay for pagination -->
 		{#if loading}
 			<div class="flex justify-center mt-4">
-				<div class="w-5 h-5 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin"></div>
+				<div
+					class="w-5 h-5 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin"
+				></div>
 			</div>
 		{/if}
 	{/if}
