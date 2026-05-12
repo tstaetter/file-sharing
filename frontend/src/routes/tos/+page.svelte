@@ -10,13 +10,13 @@
 	<title>Terms of Service — filez.zone</title>
 	<meta
 		name="description"
-		content="Terms of Service for filez.zone. Learn about the terms governing our end-to-end encrypted file sharing service, including user responsibilities, data retention, and acceptable use."
+		content="Terms of Service for filez.zone. Learn about the terms governing our end-to-end encrypted file sharing service, including optional user accounts, saved URLs, data retention, and acceptable use."
 	/>
 	<meta name="robots" content="index, follow" />
 	<meta property="og:title" content="Terms of Service — filez.zone" />
 	<meta
 		property="og:description"
-		content="Terms of Service for filez.zone. Learn about the terms governing our end-to-end encrypted file sharing service."
+		content="Terms of Service for filez.zone. Learn about the terms governing our end-to-end encrypted file sharing service, including optional user accounts and saved URLs."
 	/>
 	<meta property="og:url" content="https://filez.zone/tos" />
 	<meta property="og:type" content="website" />
@@ -24,7 +24,7 @@
 	<meta name="twitter:title" content="Terms of Service — filez.zone" />
 	<meta
 		name="twitter:description"
-		content="Terms of Service for filez.zone end-to-end encrypted file sharing."
+		content="Terms of Service for filez.zone end-to-end encrypted file sharing with optional user accounts."
 	/>
 	<link rel="canonical" href="https://filez.zone/tos" />
 </svelte:head>
@@ -59,6 +59,12 @@
 					of your files. The key is embedded in the URL hash fragment, which is never transmitted to our
 					servers.
 				</p>
+				<p class="mt-2">
+					The Service also offers <strong>optional user accounts</strong> that enable the ability to save
+					and manage shared capability URLs. Creating an account is entirely voluntary — the core file-sharing
+					functionality works without one. When you upload a file while authenticated, the capability
+					URL is automatically saved to your account for later access.
+				</p>
 			</section>
 
 			<section>
@@ -69,6 +75,18 @@
 					<li>Ensuring that you have the right to share any files you upload.</li>
 					<li>Maintaining the security of any capability links you generate.</li>
 					<li>Any consequences of sharing decryption links with third parties.</li>
+				</ul>
+				<p class="mt-2">If you create a user account, you are additionally responsible for:</p>
+				<ul class="list-disc pl-5 mt-2 space-y-1">
+					<li>Providing accurate and truthful registration information.</li>
+					<li>Maintaining the confidentiality of your account credentials (email and password).</li>
+					<li>
+						All activity that occurs under your account, including any saved URLs and file uploads.
+					</li>
+					<li>
+						Managing your saved URL collection — you can delete your account at any time via the
+						user menu, which permanently removes all associated data.
+					</li>
 				</ul>
 			</section>
 
@@ -87,6 +105,10 @@
 						Use the Service in any manner that could damage, disable, or overburden our
 						infrastructure.
 					</li>
+					<li>
+						Create accounts through automated means or impersonate other individuals without
+						authorization.
+					</li>
 				</ul>
 			</section>
 
@@ -98,12 +120,24 @@
 					Files uploaded through the Service are <strong
 						>automatically and permanently deleted</strong
 					> from our storage infrastructure immediately after the first successful download. We do not
-					retain copies of uploaded files, encryption keys, or decryption links.
+					retain copies of uploaded files, encryption keys, or decryption links after download.
 				</p>
 				<p class="mt-2">
 					If a file is never downloaded, it may remain on our servers until it is purged by routine
 					maintenance. We make no guarantees about the duration an undownloaded file will be
 					retained.
+				</p>
+				<p class="mt-2">
+					<strong
+						>User account data (email, display name, hashed password, and saved URL records)</strong
+					>
+					is retained until you choose to delete your account. Account deletion is available from the
+					user menu and permanently removes all associated data from our database. Saved URL records are
+					only accessible to you through authenticated requests using a valid JWT token in the
+					<code class="bg-slate-100 px-1 py-0.5 rounded text-xs"
+						>Authorization: Bearer &lt;token&gt;</code
+					>
+					header.
 				</p>
 			</section>
 
@@ -116,8 +150,18 @@
 					HTTP requests.
 				</p>
 				<p class="mt-2">
-					We cannot read, modify, or decrypt your files. We cannot recover lost capability links.
-					For more details, see our <a
+					For authenticated users, we use <strong>bcrypt</strong> to hash passwords with unique
+					per-password salts — plaintext passwords are never stored. Session management uses
+					<strong>JSON Web Tokens (JWT)</strong> signed with a server-side secret. The JWT is stored
+					in your browser's <strong>localStorage</strong> and sent to protected endpoints via the
+					<code class="bg-slate-100 px-1 py-0.5 rounded text-xs"
+						>Authorization: Bearer &lt;token&gt;</code
+					>
+					header, which is validated by server middleware before handlers execute.
+				</p>
+				<p class="mt-2">
+					We cannot read, modify, or decrypt your files. We cannot recover lost capability links or
+					account passwords. For more details, see our <a
 						href="/privacy"
 						class="text-blue-500 hover:text-blue-600 underline">Privacy Policy</a
 					>.
@@ -141,6 +185,10 @@
 					<li>
 						We are not liable for any loss of data, including files that fail to upload, download,
 						or decrypt correctly.
+					</li>
+					<li>
+						We are not liable for the loss of saved URL records or account data resulting from
+						account deletion, service interruption, or database failure.
 					</li>
 					<li>
 						We are not liable for any direct, indirect, incidental, or consequential damages arising
