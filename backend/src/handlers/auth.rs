@@ -10,11 +10,6 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
 
-// ── JWT configuration ─────────────────────────────────────────────────
-
-const JWT_SECRET: &str = "filez-zone-jwt-secret-change-in-production";
-const JWT_EXPIRY_HOURS: i64 = 72;
-
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     sub: String, // email
@@ -24,7 +19,9 @@ struct Claims {
 
 fn create_token(email: &str) -> Result<String, AuthError> {
     let now = Utc::now();
-    let exp = now + Duration::hours(JWT_EXPIRY_HOURS);
+    let mins = std::env::var("JWT_EXPIRY_MINS").unwrap_or("5".to_string());
+    let secret = std::env::var("JWT_SECRET").expect("No JWT secret");
+    let exp = now + Duration::minutes(mins.parse().unwrap_or_default());
 
     let claims = Claims {
         sub: email.to_string(),
@@ -35,15 +32,17 @@ fn create_token(email: &str) -> Result<String, AuthError> {
     encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(JWT_SECRET.as_bytes()),
+        &EncodingKey::from_secret(secret.as_bytes()),
     )
     .map_err(|e| AuthError::JwtToken(e.to_string()))
 }
 
 fn validate_token(token: &str) -> Result<Claims, AuthError> {
+    let secret = std::env::var("JWT_SECRET").expect("No JWT secret");
+
     decode::<Claims>(
         token,
-        &DecodingKey::from_secret(JWT_SECRET.as_bytes()),
+        &DecodingKey::from_secret(secret.as_bytes()),
         &Validation::default(),
     )
     .map(|data| data.claims)
