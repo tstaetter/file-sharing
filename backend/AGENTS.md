@@ -129,6 +129,7 @@ All endpoints are served under `http://localhost:8000/` and accept/return JSON u
 | POST   | `/v1/complete-upload` | Finalise the multipart upload with the ETags from the client's PUTs.    | `CompleteRequest`   | (empty 200)            |
 | POST   | `/v1/abort-upload`    | Abort an in-progress multipart upload and discard all uploaded parts.   | `AbortRequest`      | (empty 200)            |
 | GET    | `/v1/f/:id`           | Download the encrypted blob. **Deletes the object from R2 after read.** | —                    | Binary stream (see below) |
+| PUT    | `/v1/check-file`     | Check whether a file still exists in storage (via head_object).   | `CheckFileRequest`  | 200 OK or 404 NotFound   |
 
 ### Auth endpoints (`/v1/auth/*`)
 

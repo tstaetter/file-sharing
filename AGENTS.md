@@ -111,20 +111,28 @@ Browser                              Backend                         R2
 ## Saved URLs Flow
 
 ```
-Browser                              Backend
-  │                                    │
-  │  1. User visits /urls             │
-  │     Auth guard: redirect if       │
-  │     not authenticated             │
-  │                                    │
-  │  2. GET /v1/urls?page=1&per_page=10►│
-  │     Authorization: Bearer <token> │   require_auth middleware
-  │                                    │   validates JWT
-  │                                    │   queries MongoDB
-  │◄──── { urls, page, per_page, total }
-  │                                    │
-  │  3. Render paginated list with    │
-  │     copy & open actions           │
+Browser                              Backend                         R2
+  │                                    │                              │
+  │  1. User visits /urls             │                              │
+  │     Auth guard: redirect if       │                              │
+  │     not authenticated             │                              │
+  │                                    │                              │
+  │  2. GET /v1/urls?page=1&per_page=10►│                              │
+  │     Authorization: Bearer <token> │   require_auth middleware     │
+  │                                    │   validates JWT              │
+  │                                    │   queries MongoDB            │
+  │◄──── { urls, page, per_page, total }                              │
+  │                                    │                              │
+  │  3. For each saved URL:           │                              │
+  │     PUT /v1/check-file            │                              │
+  │     { key: fileId } ─────────────►│   head_object ──────────────►│
+  │                                    │◄─────── 200 or 404 ─────────│
+  │◄──── 200 (exists) or 404 (gone)   │                              │
+  │                                    │                              │
+  │  4. Render paginated list with    │                              │
+  │     copy & open actions, and      │                              │
+  │     "Already used" badges for     │                              │
+  │     consumed files                │                              │
 ```
 
 ## Running the Full Stack
@@ -209,6 +217,7 @@ Set `PUBLIC_API_PREFIX` in `frontend/.env` (or your deployment environment) to p
 | POST   | `/v1/complete-upload` | None                          | Finalise multipart upload               |
 | POST   | `/v1/abort-upload`    | None                          | Cancel multipart upload                 |
 | GET    | `/v1/f/:id`           | None                          | Download encrypted blob (burn-after-read) |
+| PUT    | `/v1/check-file`     | None                          | Check if a file still exists in storage   |
 | POST   | `/v1/auth/register`   | None                          | Register new user                       |
 | POST   | `/v1/auth/login`      | None                          | Authenticate, get JWT                   |
 | POST   | `/v1/auth/delete`     | Token in body                 | Delete user account                     |

@@ -113,6 +113,7 @@ cargo run
 | POST | `/v1/complete-upload` | Finalise multipart upload with ETags |
 | POST | `/v1/abort-upload` | Cancel an in-progress multipart upload |
 | GET | `/v1/f/:id` | Download encrypted blob and **delete from R2** |
+| PUT | `/v1/check-file` | Check if a file still exists in storage (head_object) |
 
 ### Auth endpoints (token in request body)
 
@@ -143,7 +144,7 @@ filez.zone supports optional user accounts for managing shared files. Accounts a
 
 The backend serves auth endpoints at `/v1/auth/register`, `/v1/auth/login`, and `/v1/auth/delete`. The frontend provides login and registration pages at `/login` and `/register`.
 
-Authenticated users automatically get their capability URLs saved after upload. Saved URLs can be browsed at `/urls` with pagination, copy-to-clipboard, and direct-open actions.
+Authenticated users automatically get their capability URLs saved after upload. Saved URLs can be browsed at `/urls` with pagination, copy-to-clipboard, and direct-open actions. Each saved URL is checked against storage to show an **"Already used" badge** when the file has been consumed by a burn-after-read download.
 
 ### Authentication Architecture
 

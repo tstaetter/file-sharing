@@ -224,14 +224,16 @@ Then define the following tasks in `deno.json`:
 1. Authenticated users navigate to `/urls` (via nav link or auto-save confirmation).
 2. The page checks `auth.isAuthenticated` on mount — redirects to `/login` if not authenticated.
 3. Calls `listUrls(auth.token, page, perPage)` from `src/lib/savedUrls.ts`.
-4. Displays saved URLs in a paginated list with:
+4. For each saved URL, calls `checkFile(fileId)` from `src/lib/savedUrls.ts` to check if the underlying file still exists in storage (via `PUT /v1/check-file`).
+5. Displays saved URLs in a paginated list with:
    - **Title** (or truncated URL if no title was set).
    - **Full URL** underneath when a title is present.
    - **Formatted save date**.
+   - **"Already used" badge** — shown when the file has been consumed (check-file returns 404).
    - **Copy button** — copies the capability URL to clipboard with checkmark feedback.
    - **Open button** — opens the link in a new tab.
-5. Supports pagination with Previous/Next buttons and page counter.
-6. Handles loading, empty, and error states.
+6. Supports pagination with Previous/Next buttons and page counter.
+7. Handles loading, empty, and error states.
 
 ### Encryption Model
 
@@ -253,6 +255,7 @@ The frontend reads the backend base URL from `PUBLIC_API_PREFIX` in `$env/static
 | POST   | `/v1/complete-upload`  | `upload.ts` (SDK)        | Finalise multipart upload           |
 | POST   | `/v1/abort-upload`     | `upload.ts` (SDK)        | Cancel multipart upload             |
 | GET    | `/v1/f/:id`            | `f/[id]/+page.svelte`    | Fetch encrypted blob (burn-after-read) |
+| PUT    | `/v1/check-file`      | `urls/+page.svelte`      | Check if a file still exists in storage |
 
 ### Auth endpoints (token in request body)
 
