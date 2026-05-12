@@ -1,6 +1,6 @@
 use crate::db::saved_url::SavedUrl;
-use crate::handlers::auth::validate_token;
 use crate::handlers::errors::SavedUrlError;
+use crate::middleware::AuthUser;
 use crate::AppState;
 use axum::extract::{Query, State};
 use axum::Json;
@@ -18,12 +18,10 @@ const MAX_PER_PAGE: u64 = 100;
 pub struct SaveUrlRequest {
     pub url: String,
     pub title: Option<String>,
-    pub token: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ListUrlsQuery {
-    pub token: String,
     #[serde(default = "default_page")]
     pub page: u64,
     #[serde(default = "default_per_page")]
@@ -68,10 +66,11 @@ impl From<&SavedUrl> for SaveUrlResponse {
 
 /// Save a capability URL to the authenticated user's collection.
 ///
-/// Requires a valid JWT token. The user is identified by the email in the
-/// token's `sub` claim. Returns the saved URL record with its generated ID
-/// and timestamp.
+/// Requires a valid `Authorization: Bearer <token>` header. The user is
+/// identified by the email in the token's `sub` claim. Returns the saved
+/// URL record with its generated ID and timestamp.
 pub async fn save_url(
+    auth_user: AuthUser,
     State(state): State<AppState>,
     Json(req): Json<SaveUrlRequest>,
 ) -> Result<Json<SaveUrlResponse>, SavedUrlError> {
@@ -79,10 +78,6 @@ pub async fn save_url(
     if req.url.trim().is_empty() {
         return Err(SavedUrlError::EmptyUrl);
     }
-
-    // Authenticate and extract user email
-    let claims =
-        validate_token(&req.token).map_err(|e| SavedUrlError::InvalidToken(e.to_string()))?;
 
     // Get database handle
     let db = state
@@ -92,7 +87,7 @@ pub async fn save_url(
     let collection = db.collection::<SavedUrl>("saved_urls");
 
     // Create and insert the saved URL
-    let saved = SavedUrl::new(claims.sub, req.url, req.title);
+    let saved = SavedUrl::new(auth_user.claims.sub, req.url, req.title);
     collection
         .insert_one(&saved)
         .await
@@ -103,10 +98,11 @@ pub async fn save_url(
 
 /// List the authenticated user's saved URLs with pagination.
 ///
-/// Requires a valid JWT token. Returns URLs in reverse chronological order
-/// (newest first). Supports `page` (default 1) and `per_page` (default 10,
-/// max 100) query parameters.
+/// Requires a valid `Authorization: Bearer <token>` header. Returns URLs in
+/// reverse chronological order (newest first). Supports `page` (default 1)
+/// and `per_page` (default 10, max 100) query parameters.
 pub async fn list_urls(
+    auth_user: AuthUser,
     State(state): State<AppState>,
     Query(query): Query<ListUrlsQuery>,
 ) -> Result<Json<ListUrlsResponse>, SavedUrlError> {
@@ -118,10 +114,6 @@ pub async fn list_urls(
         return Err(SavedUrlError::InvalidPerPage);
     }
 
-    // Authenticate and extract user email
-    let claims =
-        validate_token(&query.token).map_err(|e| SavedUrlError::InvalidToken(e.to_string()))?;
-
     // Get database handle
     let db = state
         .database
@@ -130,7 +122,7 @@ pub async fn list_urls(
     let collection = db.collection::<SavedUrl>("saved_urls");
 
     // Count total documents for this user
-    let filter = doc! { "user_email": &claims.sub };
+    let filter = doc! { "user_email": &auth_user.claims.sub };
     let total = collection
         .count_documents(filter.clone())
         .await
@@ -175,29 +167,22 @@ mod tests {
 
     #[test]
     fn test_save_url_request_deserializes() {
-        let json = r#"{"url":"https://filez.zone/f/abc#key","token":"eyJ..."}"#;
+        let json = r#"{"url":"https://filez.zone/f/abc#key"}"#;
         let req: SaveUrlRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.url, "https://filez.zone/f/abc#key");
-        assert_eq!(req.token, "eyJ...");
         assert!(req.title.is_none());
     }
 
     #[test]
     fn test_save_url_request_with_title() {
-        let json = r#"{"url":"https://filez.zone/f/abc#key","title":"My file","token":"eyJ..."}"#;
+        let json = r#"{"url":"https://filez.zone/f/abc#key","title":"My file"}"#;
         let req: SaveUrlRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.title.as_deref(), Some("My file"));
     }
 
     #[test]
     fn test_save_url_request_rejects_missing_url() {
-        let json = r#"{"token":"eyJ..."}"#;
-        serde_json::from_str::<SaveUrlRequest>(json).unwrap_err();
-    }
-
-    #[test]
-    fn test_save_url_request_rejects_missing_token() {
-        let json = r#"{"url":"https://example.com"}"#;
+        let json = r#"{"title":"test"}"#;
         serde_json::from_str::<SaveUrlRequest>(json).unwrap_err();
     }
 
@@ -211,25 +196,18 @@ mod tests {
 
     #[test]
     fn test_list_urls_query_defaults() {
-        let json = r#"{"token":"eyJ..."}"#;
+        let json = r#"{}"#;
         let query: ListUrlsQuery = serde_json::from_str(json).unwrap();
-        assert_eq!(query.token, "eyJ...");
         assert_eq!(query.page, 1);
         assert_eq!(query.per_page, DEFAULT_PER_PAGE);
     }
 
     #[test]
     fn test_list_urls_query_with_page_and_per_page() {
-        let json = r#"{"token":"eyJ...","page":3,"per_page":25}"#;
+        let json = r#"{"page":3,"per_page":25}"#;
         let query: ListUrlsQuery = serde_json::from_str(json).unwrap();
         assert_eq!(query.page, 3);
         assert_eq!(query.per_page, 25);
-    }
-
-    #[test]
-    fn test_list_urls_query_rejects_missing_token() {
-        let json = r#"{"page":1}"#;
-        serde_json::from_str::<ListUrlsQuery>(json).unwrap_err();
     }
 
     #[test]
@@ -237,7 +215,7 @@ mod tests {
         // Page 0 should be allowed during deserialization — the handler
         // will reject it with InvalidPage. This ensures the validation
         // logic is in the handler, not serde.
-        let json = r#"{"token":"eyJ...","page":0}"#;
+        let json = r#"{"page":0}"#;
         let query: ListUrlsQuery = serde_json::from_str(json).unwrap();
         assert_eq!(query.page, 0);
     }
@@ -381,7 +359,6 @@ mod tests {
     #[test]
     fn test_query_default_page_is_1() {
         let query = ListUrlsQuery {
-            token: "t".into(),
             page: default_page(),
             per_page: default_per_page(),
         };
@@ -402,20 +379,6 @@ mod tests {
     }
 
     // ── Unit tests: Token integration ─────────────────────────────────
-
-    #[test]
-    fn test_list_urls_requires_token() {
-        // Token field is required by serde — verified by deserialization tests above
-        let json = r#"{"page":1}"#;
-        assert!(serde_json::from_str::<ListUrlsQuery>(json).is_err());
-    }
-
-    #[test]
-    fn test_save_url_requires_token() {
-        // Token field is required by serde — verified by deserialization tests above
-        let json = r#"{"url":"https://example.com"}"#;
-        assert!(serde_json::from_str::<SaveUrlRequest>(json).is_err());
-    }
 
     // ── Unit tests: Response ID is a valid UUID string ────────────────
 
