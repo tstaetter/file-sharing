@@ -1,6 +1,6 @@
 use crate::handlers::{
-    abort_upload, complete_upload, create_upload, delete_user, download, health, list_urls, login,
-    register, save_url, sign_parts,
+    abort_upload, check_file, complete_upload, create_upload, delete_user, download, health,
+    list_urls, login, register, save_url, sign_parts,
 };
 use crate::middleware::require_auth;
 use crate::AppState;
@@ -20,6 +20,7 @@ pub fn app(state: AppState) -> Router {
         .layer(middleware::from_fn(require_auth));
     let routes = Router::new()
         .route("/create-upload", post(create_upload))
+        .route("/check-file", get(check_file))
         .route("/sign-parts", post(sign_parts))
         .route("/complete-upload", post(complete_upload))
         .route("/abort-upload", post(abort_upload))

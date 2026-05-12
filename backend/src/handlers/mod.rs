@@ -1,5 +1,6 @@
 mod abort_upload;
 mod auth;
+mod check_file;
 mod complete_upload;
 mod create_upload;
 mod download;
@@ -10,6 +11,7 @@ mod sign_parts;
 
 pub use abort_upload::*;
 pub use auth::*;
+pub use check_file::*;
 pub use complete_upload::*;
 pub use create_upload::*;
 pub use download::*;
