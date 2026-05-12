@@ -18,6 +18,8 @@ struct Claims {
 }
 
 fn create_token(email: &str) -> Result<String, AuthError> {
+    dotenvy::dotenv().ok();
+
     let now = Utc::now();
     let mins = std::env::var("JWT_EXPIRY_MINS").unwrap_or("5".to_string());
     let secret = std::env::var("JWT_SECRET").expect("No JWT secret");
@@ -38,6 +40,8 @@ fn create_token(email: &str) -> Result<String, AuthError> {
 }
 
 fn validate_token(token: &str) -> Result<Claims, AuthError> {
+    dotenvy::dotenv().ok();
+
     let secret = std::env::var("JWT_SECRET").expect("No JWT secret");
 
     decode::<Claims>(
