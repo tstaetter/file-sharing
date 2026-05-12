@@ -7,6 +7,8 @@ This is the frontend for a file-sharing service, built with **SvelteKit**. It pr
 1. **Upload files** with client-side AES-256-GCM encryption and multipart, resumable uploads directly to Cloudflare R2 via presigned URLs.
 2. **Download files** exactly once — the backend deletes the object from storage after serving it ("burn after reading").
 3. **Share files** via capability URLs that embed the decryption key in the URL hash fragment. The key never touches the server.
+4. **Save and manage capability URLs** for authenticated users — links are auto-saved after upload and browsable in a paginated list view.
+5. **Authenticate** with JWT-based login/register, with the token persisted in localStorage and sent via `Authorization: Bearer` header for protected endpoints.
 
 All encryption and decryption happens in the browser using the Web Crypto API. The frontend communicates with a Rust/Axum backend (documented separately in `backend/AGENTS.md`).
 
@@ -49,19 +51,38 @@ frontend/
     ├── app.html                 ← HTML shell
     ├── lib/
     │   ├── index.ts             ← barrel export for $lib
-    │   ├── chunk.ts             ← file chunking generator
-    │   ├── crypto.ts            ← AES-GCM key generation & encryption
-    │   ├── upload.ts            ← multipart upload orchestrator
-    │   ├── wasm.ts              ← capability URL builder (url-safe base64)
+    │   ├── auth.svelte.ts       ← Svelte 5 runes auth store (JWT, localStorage, reactive state)
+    │   ├── savedUrls.ts         ← API module for saved capability URLs (Bearer auth)
+    │   ├── upload.ts            ← multipart upload orchestrator wrapper
     │   └── assets/
-    │       └── favicon.svg
+    │       └── logo.webp
     └── routes/
-        ├── +layout.svelte       ← root layout (favicon, global CSS)
-        ├── +page.svelte         ← upload page (file picker, encrypt & upload)
-        └── f/
-            └── [id]/
-                └── +page.svelte ← download page (fetch, decrypt, save)
+        ├── +layout.svelte       ← root layout (header nav with auth, footer, global CSS)
+        ├── +page.svelte         ← upload page (file picker, encrypt & upload, auto-save)
+        ├── f/
+        │   └── [id]/
+        │       └── +page.svelte ← download page (fetch, decrypt, save)
+        ├── urls/
+        │   └── +page.svelte     ← saved URLs list page (paginated, copy, open)
+        ├── health/
+        │   └── +server.ts       ← health check endpoint
+        ├── login/
+        │   └── +page.svelte     ← login page
+        ├── register/
+        │   └── +page.svelte     ← registration page
+        ├── zero-knowledge/
+        │   └── +page.svelte     ← zero-knowledge architecture explanation
+        ├── privacy/
+        │   └── +page.svelte     ← privacy policy
+        ├── cookies/
+        │   └── +page.svelte     ← cookie policy
+        ├── tos/
+        │   └── +page.svelte     ← terms of service
+        └── sitemap.xml/
+            └── +server.ts       ← dynamic sitemap generation
 ```
+
+The SDK logic (encryption, chunking, capability URL building) lives in `packages/shazoneSDK/` and is imported as a workspace dependency. The thin wrapper in `src/lib/upload.ts` binds the backend URL from the environment.
 
 ## Setup Instructions
 
@@ -75,6 +96,7 @@ frontend/
 
    ```env
    PUBLIC_API_PREFIX=http://localhost:8000/v1
+   PUBLIC_PREFIX=http://localhost:5173
    ```
 
    SvelteKit requires browser-accessible environment variables to be prefixed with `PUBLIC_`. They are imported in client-side code via `$env/static/public`:
@@ -82,6 +104,9 @@ frontend/
    ```typescript
    import { PUBLIC_API_PREFIX } from '$env/static/public';
    ```
+
+   - `PUBLIC_API_PREFIX` — the backend API base URL (used by `upload.ts`, `savedUrls.ts`, and `f/[id]/+page.svelte`)
+   - `PUBLIC_PREFIX` — the frontend base URL for building capability URLs
 
    Make sure the backend is running, or update `PUBLIC_API_PREFIX` if the backend is deployed elsewhere.
 
@@ -97,7 +122,7 @@ frontend/
   ```bash
   deno task build
   ```
-  Output appears in `build/` (adapter-auto).
+  Output appears in `build/` (adapter-node).
 
 - **Preview production build locally:**
   ```bash
@@ -156,31 +181,11 @@ Then define the following tasks in `deno.json`:
 
 ### Writing Tests
 
-- Place test files next to the source files they exercise, using the `.test.ts` or `.spec.ts` extension. For example, tests for `src/lib/crypto.ts` would go in `src/lib/crypto.test.ts`.
+- Place test files next to the source files they exercise, using the `.test.ts` or `.spec.ts` extension. For example, tests for `src/lib/savedUrls.ts` would go in `src/lib/savedUrls.test.ts`.
 - Alternatively, place tests in a `__tests__` directory.
 - Since most of the library code is pure TypeScript with no DOM dependencies, tests can import and call the functions directly.
 - For encryption tests, use the real Web Crypto API (available in Deno and Node.js 19+) or mock `crypto.subtle` if needed.
-- For upload orchestration tests, mock `fetch` to simulate backend responses without requiring a running server.
-
-### Example Test
-
-```typescript
-// src/lib/crypto.test.ts
-import { describe, it, expect } from 'vitest';
-import { generateKey, encryptChunk } from './crypto';
-
-describe('encryptChunk', () => {
-  it('should encrypt a chunk and produce IV + ciphertext', async () => {
-    const { key } = await generateKey();
-    const plaintext = new Uint8Array([1, 2, 3, 4]);
-    const { iv, data } = await encryptChunk(key, plaintext);
-
-    expect(iv.length).toBe(12);          // AES-GCM IV
-    expect(data.length).toBe(20);        // plaintext + GCM tag
-    expect(data).not.toEqual(plaintext);  // encrypted ≠ plaintext
-  });
-});
-```
+- For upload orchestration and saved URL tests, mock `fetch` to simulate backend responses without requiring a running server.
 
 ## Application Flow
 
@@ -188,46 +193,81 @@ describe('encryptChunk', () => {
 
 1. User selects a file via the file picker on `+page.svelte`.
 2. On click of "Encrypt & upload", `uploadFile()` in `src/lib/upload.ts` is called:
-   - Generates a 256-bit AES-GCM key and a random UUID as the `file_id`.
-   - Calls `POST /v1/create-upload` on the backend to initiate a multipart upload.
-   - Iterates over the file in 5 MB chunks (`chunkFile()` from `src/lib/chunk.ts`).
-   - Each chunk is encrypted with `encryptChunk()` from `src/lib/crypto.ts`, which prepends a 12-byte random IV followed by the ciphertext (including the 16-byte GCM authentication tag).
+   - Delegates to the `shazoneSDK` `uploadFile` function with the backend URL from `PUBLIC_API_PREFIX`.
+   - The SDK generates a 256-bit AES-GCM key and a random UUID as the `file_id`.
+   - Calls `POST /v1/create-upload` to initiate a multipart upload.
+   - Splits the file into 6 MiB chunks, encrypts each with a random IV.
    - For each chunk, requests a presigned URL from `POST /v1/sign-parts` and PUTs the encrypted payload directly to R2.
-   - Collects the ETag from each PUT response.
-   - Calls `POST /v1/complete-upload` with the list of part numbers and ETags.
+   - Collects ETags and finalises with `POST /v1/complete-upload`.
 3. Returns the raw AES key bytes and file ID.
-4. `createCapabilityUrl()` in `src/lib/wasm.ts` builds the shareable URL by encoding the key as URL-safe base64 (no padding) and appending it as the URL hash fragment.
+4. `createCapabilityUrl()` builds the shareable URL: `{PUBLIC_PREFIX}/f/{fileId}#{url-safe-base64(key)}`.
+5. **Auto-save (authenticated users only):** After a successful upload, if `auth.isAuthenticated` is true:
+   - Calls `saveUrl(link, file.name, auth.token)` from `src/lib/savedUrls.ts`.
+   - Uses the original filename as the URL title.
+   - Silently handles failures — the upload still succeeded, saving is a bonus.
+   - Shows inline feedback: "Saving link to your collection…" while in progress, then a "Saved to your collection" link to `/urls` on success.
 
 ### Download (`/f/[id]` route)
 
 1. Recipient opens the capability URL. The key is extracted from `location.hash.slice(1)`.
 2. `onMount` in `+page.svelte` fetches `GET /v1/f/{id}` from the backend.
-3. The backend returns the encrypted blob as base64-encoded JSON, along with the original `content_type`.
+3. The backend returns the encrypted blob as a binary stream, along with the original `content_type` and `chunk_size` in response headers.
 4. The frontend:
-   - Decodes the base64 key and imports it as a `CryptoKey`.
+   - Decodes the URL-safe base64 key and imports it as a `CryptoKey`.
    - Splits the encrypted data into per-chunk `IV (12 bytes) || ciphertext+tag` segments.
-   - Decrypts each chunk with Web Crypto API.
+   - Decrypts each chunk with the Web Crypto API.
    - Concatenates plaintext chunks.
-   - Creates a Blob and an object URL.
-5. The user clicks "Download" to trigger a browser download. The object URL is revoked on component destroy.
+   - Creates a Blob and triggers a browser download.
+
+### Saved URLs (`/urls` route)
+
+1. Authenticated users navigate to `/urls` (via nav link or auto-save confirmation).
+2. The page checks `auth.isAuthenticated` on mount — redirects to `/login` if not authenticated.
+3. Calls `listUrls(auth.token, page, perPage)` from `src/lib/savedUrls.ts`.
+4. Displays saved URLs in a paginated list with:
+   - **Title** (or truncated URL if no title was set).
+   - **Full URL** underneath when a title is present.
+   - **Formatted save date**.
+   - **Copy button** — copies the capability URL to clipboard with checkmark feedback.
+   - **Open button** — opens the link in a new tab.
+5. Supports pagination with Previous/Next buttons and page counter.
+6. Handles loading, empty, and error states.
 
 ### Encryption Model
 
 - **Algorithm:** AES-256-GCM.
-- **Per-chunk IVs:** Each 5 MB chunk gets its own random 12-byte IV, which is prepended to the ciphertext. This avoids needing a single nonce and allows chunks to be decrypted independently.
+- **Per-chunk IVs:** Each chunk gets its own random 12-byte IV prepended to the ciphertext. Chunks can be decrypted independently.
 - **Key distribution:** The symmetric key is embedded in the URL hash fragment. Hash fragments are never sent to the server over HTTP, so the key stays client-side.
 - **Backend opacity:** The backend stores and serves raw encrypted bytes. It never sees the key or plaintext.
 
 ## API Contract with Backend
 
-The frontend reads the backend base URL from `PUBLIC_API_PREFIX` in `$env/static/public` (set in `.env`). Both `upload.ts` and the download page use this variable, so changing the backend URL only requires updating the `.env` file.
+The frontend reads the backend base URL from `PUBLIC_API_PREFIX` in `$env/static/public` (set in `.env`). The upload wrapper, the download page, and the saved URLs module all use this variable.
+
+### File-sharing endpoints (no auth required)
 
 | Method | Endpoint            | Used in                  | Purpose                             |
 |--------|---------------------|--------------------------|-------------------------------------|
-| POST   | `/v1/create-upload`    | `upload.ts`             | Initiate multipart upload           |
-| POST   | `/v1/sign-parts`       | `upload.ts`             | Get presigned URLs for parts        |
-| POST   | `/v1/complete-upload`  | `upload.ts`             | Finalise multipart upload           |
-| GET    | `/v1/f/:id`            | `f/[id]/+page.svelte`   | Fetch encrypted blob (burn-after-read) |
+| POST   | `/v1/create-upload`    | `upload.ts` (SDK)        | Initiate multipart upload           |
+| POST   | `/v1/sign-parts`       | `upload.ts` (SDK)        | Get presigned URLs for parts        |
+| POST   | `/v1/complete-upload`  | `upload.ts` (SDK)        | Finalise multipart upload           |
+| POST   | `/v1/abort-upload`     | `upload.ts` (SDK)        | Cancel multipart upload             |
+| GET    | `/v1/f/:id`            | `f/[id]/+page.svelte`    | Fetch encrypted blob (burn-after-read) |
+
+### Auth endpoints (token in request body)
+
+| Method | Endpoint            | Used in                  | Purpose                             |
+|--------|---------------------|--------------------------|-------------------------------------|
+| POST   | `/v1/auth/register`    | `auth.svelte.ts`         | Register new user                   |
+| POST   | `/v1/auth/login`       | `auth.svelte.ts`         | Authenticate and get JWT            |
+| POST   | `/v1/auth/delete`      | `auth.svelte.ts`         | Delete user account                 |
+
+### Protected endpoints (Bearer auth required)
+
+| Method | Endpoint            | Used in                  | Purpose                             | Auth Header                        |
+|--------|---------------------|--------------------------|-------------------------------------|------------------------------------|
+| POST   | `/v1/urls`             | `savedUrls.ts`           | Save a capability URL               | `Authorization: Bearer <token>`    |
+| GET    | `/v1/urls`             | `savedUrls.ts`           | List saved URLs (paginated)         | `Authorization: Bearer <token>`    |
 
 Refer to `backend/AGENTS.md` for the request/response schemas.
 
@@ -237,19 +277,25 @@ Refer to `backend/AGENTS.md` for the request/response schemas.
 - **ESLint** with the `eslint-plugin-svelte` and `typescript-eslint` plugins handles linting. Run `deno task lint` and fix all issues.
 - **TypeScript strict mode** is enabled (`"strict": true` in `tsconfig.json`). Do not weaken type safety without a documented reason.
 - Use **Svelte 5 runes** (`$state`, `$derived`, `$props`, `$effect`) for all new code. The `svelte.config.js` forces runes mode project-wide.
-- **$lib alias:** Import shared modules via `$lib/` (e.g., `import { uploadFile } from '$lib/upload'`). Do not use relative paths to reach into `src/lib/`.
+- **$lib alias:** Import shared modules via `$lib/` (e.g., `import { saveUrl } from '$lib/savedUrls'`). Do not use relative paths to reach into `src/lib/`.
 - **File naming:** Use `kebab-case` for route directories and `.ts` / `.svelte` extensions for modules and components. Test files use `.test.ts`.
 - **Environment-specific URLs:** The backend base URL is configured via the `PUBLIC_API_PREFIX` environment variable in `frontend/.env`, accessible in browser-side code through `$env/static/public`.
+- **Bearer token auth:** All protected API calls pass the JWT via `Authorization: Bearer <token>` header. The token is stored in `auth.token` from the reactive auth store.
 
 ## Common Tasks for Agents
 
 ### Adding a new library module
 
-1. Create the new file in `src/lib/` (e.g., `src/lib/utils.ts`).
+1. Create the new file in `src/lib/` (e.g., `src/lib/myModule.ts`).
 2. If it should be importable via `$lib`, export from `src/lib/index.ts`:
    ```typescript
-   export { myFunction } from './utils';
+   export { myFunction } from './myModule';
    ```
+3. For API modules, follow the pattern in `savedUrls.ts`:
+   - Import `PUBLIC_API_PREFIX` from `$env/static/public`.
+   - For protected endpoints, accept a `token: string` parameter and set the `Authorization: Bearer ${token}` header.
+   - Define TypeScript interfaces for request/response types.
+   - Throw descriptive errors on non-ok responses.
 
 ### Adding a new route
 
@@ -257,24 +303,73 @@ Refer to `backend/AGENTS.md` for the request/response schemas.
 2. Add a `+page.svelte` file inside.
 3. For dynamic routes, use `[param]` directory naming (e.g., `src/routes/file/[id]/`).
 4. Access route params in the component via `page.params.<name>` from `$app/state`.
-5. If the route needs a shared layout, add a `+layout.svelte` in a parent directory.
+5. For protected pages (auth required), add an auth guard in `onMount`:
+   ```typescript
+   import { onMount } from 'svelte';
+   import { auth } from '$lib/auth.svelte';
+   import { goto } from '$app/navigation';
+
+   onMount(() => {
+     if (!auth.isAuthenticated) {
+       goto('/login');
+       return;
+     }
+     // fetch data...
+   });
+   ```
 
 ### Adding a test
 
 1. Install vitest if not yet present: `deno add --dev npm:vitest` and add the test tasks to `deno.json` (see Testing section above).
 2. Create a `.test.ts` file next to the module being tested.
 3. Use `describe`, `it`, `expect` from `vitest`.
-4. Mock external dependencies (`fetch`, `crypto.subtle`) as needed to keep tests fast and deterministic.
-5. Run tests with `deno task test`.
+4. Mock `fetch` for API module tests to simulate backend responses without requiring a running server.
+5. For component tests, use `@testing-library/svelte` or SvelteKit's test helpers.
 
 ### Updating the backend URL
 
 1. Update the `PUBLIC_API_PREFIX` value in `frontend/.env`.
-2. Both `upload.ts` and `+page.svelte` import `PUBLIC_API_PREFIX` from `$env/static/public`, so no code changes are needed.
-3. For deployments, set `PUBLIC_API_PREFIX` in the production environment rather than in `.env`.
+2. The value is imported by `upload.ts`, `savedUrls.ts`, and `f/[id]/+page.svelte` from `$env/static/public`, so no code changes are needed for these modules.
+3. For deployments, set `PUBLIC_API_PREFIX` in the production environment or as a build arg.
 
 ### Adding a UI dependency
 
 1. Install the package with `deno add npm:<package>` (or `deno add jsr:<package>` for JSR packages).
 2. If it's a dev dependency, use `deno add --dev npm:<package>`.
 3. Import it only where needed — avoid polluting the global scope.
+
+### Working with the auth store
+
+The auth store (`src/lib/auth.svelte.ts`) uses Svelte 5 runes for reactive state:
+
+```typescript
+import { auth } from '$lib/auth.svelte';
+
+// Reactive state (read in components or other modules)
+auth.token          // string | null — the JWT
+auth.user           // { email, name } | null
+auth.loading        // boolean — true during API calls
+auth.error          // string | null — last error message
+auth.isAuthenticated // boolean — derived from token presence and expiry
+
+// Actions
+auth.signUp(email, password, name)  // register and log in
+auth.signIn(email, password)        // log in
+auth.signOut()                      // clear session
+auth.deleteAccount()                // delete account and sign out
+auth.clearError()                   // clear error state
+```
+
+### Working with the saved URLs API
+
+```typescript
+import { saveUrl, listUrls, type SavedUrlItem } from '$lib/savedUrls';
+import { auth } from '$lib/auth.svelte';
+
+// Save a URL (requires valid token)
+const result = await saveUrl('https://filez.zone/f/abc#key', 'My file', auth.token!);
+// result = { id: "uuid", url: "...", title: "My file", created_at: "2025-..." }
+
+// List saved URLs with pagination
+const list = await listUrls(auth.token!, 1, 10);
+// list = { urls: [...], page: 1, per_page: 10, total: 42 }
