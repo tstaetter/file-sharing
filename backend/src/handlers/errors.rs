@@ -47,6 +47,54 @@ pub enum CreateUploadError {
     ResponseBuilder(String),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum AuthError {
+    #[error("user with this email already exists")]
+    UserExists,
+
+    #[error("invalid email or password")]
+    InvalidCredentials,
+
+    #[error("user not found")]
+    NotFound,
+
+    #[error("failed to hash password")]
+    HashError,
+
+    #[error("failed to create JWT token: {0}")]
+    JwtToken(String),
+
+    #[error("invalid or expired token: {0}")]
+    JwtValidation(String),
+
+    #[error("database error: {0}")]
+    Database(String),
+}
+
+impl IntoResponse for AuthError {
+    fn into_response(self) -> Response {
+        let status = match &self {
+            Self::UserExists => StatusCode::CONFLICT,
+            Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
+            Self::NotFound => StatusCode::NOT_FOUND,
+            Self::HashError => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::JwtToken(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::JwtValidation(_) => StatusCode::UNAUTHORIZED,
+            Self::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        (status, self.to_string()).into_response()
+    }
+}
+
+impl IntoResponse for CreateUploadError {
+    fn into_response(self) -> Response {
+        let status = match &self {
+            Self::ResponseBuilder(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        (status, self.to_string()).into_response()
+    }
+}
+
 impl IntoResponse for SignPartsError {
     fn into_response(self) -> Response {
         let status = match &self {

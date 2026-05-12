@@ -1,10 +1,40 @@
 <script lang="ts">
 	import '../app.css';
+	import { auth } from '$lib/auth.svelte';
+	import { goto } from '$app/navigation';
 
 	let { children } = $props();
 
 	const currentYear = new Date().getFullYear();
 	const siteUrl = 'https://filez.zone';
+
+	let showMenu = $state(false);
+
+	function toggleMenu() {
+		showMenu = !showMenu;
+	}
+
+	function closeMenu() {
+		showMenu = false;
+	}
+
+	async function handleLogout() {
+		auth.signOut();
+		showMenu = false;
+		goto('/');
+	}
+
+	async function handleDeleteAccount() {
+		const confirmed = confirm(
+			'Are you sure you want to delete your account? This action cannot be undone.'
+		);
+		if (!confirmed) return;
+		const ok = await auth.deleteAccount();
+		if (ok) {
+			showMenu = false;
+			goto('/');
+		}
+	}
 </script>
 
 <svelte:head>
@@ -12,7 +42,7 @@
 	<link rel="apple-touch-icon" href="/logo.webp" />
 	<meta
 		name="description"
-		content="End-to-end encrypted file sharing. Files are encrypted in your browser before upload and deleted after download. No accounts, no tracking."
+		content="End-to-end encrypted file sharing. Files are encrypted in your browser before upload and deleted after download."
 	/>
 	<meta name="robots" content="index, follow" />
 	<meta property="og:site_name" content="filez.zone" />
@@ -67,6 +97,86 @@
 				>
 					Privacy
 				</a>
+
+				<!-- Auth section -->
+				{#if auth.isAuthenticated && auth.user}
+					<!-- User menu -->
+					<div class="relative ml-2">
+						<button
+							onclick={toggleMenu}
+							class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+						>
+							<div
+								class="w-6 h-6 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-[10px] font-bold"
+							>
+								{auth.user.name.charAt(0).toUpperCase()}
+							</div>
+							<span class="hidden sm:inline">{auth.user.name}</span>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="w-3 h-3 text-slate-400"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+								/>
+							</svg>
+						</button>
+
+						<!-- Dropdown -->
+						{#if showMenu}
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<div
+								class="fixed inset-0 z-20"
+								onclick={closeMenu}
+								onkeydown={(e: KeyboardEvent) => {
+									if (e.key === 'Escape') closeMenu();
+								}}
+								role="presentation"
+							></div>
+							<div
+								class="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-30"
+							>
+								<div class="px-3 py-2 border-b border-slate-100">
+									<p class="text-xs font-medium text-slate-700">{auth.user.name}</p>
+									<p class="text-[10px] text-slate-400">{auth.user.email}</p>
+								</div>
+								<button
+									onclick={handleLogout}
+									class="w-full text-left px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+								>
+									Log out
+								</button>
+								<button
+									onclick={handleDeleteAccount}
+									class="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+								>
+									Delete account
+								</button>
+							</div>
+						{/if}
+					</div>
+				{:else}
+					<div class="flex items-center gap-1 ml-2">
+						<a
+							href="/login"
+							class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+						>
+							Log in
+						</a>
+						<a
+							href="/register"
+							class="px-3 py-1.5 text-xs font-medium text-white bg-violet-500 hover:bg-violet-600 rounded-lg transition-colors shadow-sm"
+						>
+							Sign up
+						</a>
+					</div>
+				{/if}
 			</nav>
 		</div>
 	</header>
@@ -82,7 +192,7 @@
 			<span>&copy; {currentYear} filez.zone</span>
 			<nav class="flex gap-4 items-center">
 				<a
-					href="https://github.com/tstaetter/file-sharing"
+					href="https://github.com/sha-zone/file-sharing"
 					target="_blank"
 					rel="noopener noreferrer"
 					class="hover:text-slate-600 transition-colors inline-flex items-center gap-1.5"

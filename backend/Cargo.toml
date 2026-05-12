@@ -7,10 +7,15 @@ readme = "README.md"
 
 [dependencies]
 atty = "0.2"
+anyhow = "1"
+bson = { version = "3", features = ["chrono-0_4", "serde", "serde_with-3"] }
+mongodb = { version = "3", features = ["bson-3"] }
 dotenvy = "0.15"
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
+serde-helpers = "0.1"
+serde_with = { version = "3", features = ["json", "hex", "macros"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde_json = "1"
@@ -21,6 +26,9 @@ tower-http = { version = "0.6", features = ["cors"] }
 tokio-util = { version = "0.7", features = ["io"] }
 futures = "0.3"
 uuid = { version = "1", features = ["v4"] }
+bcrypt = "0.19.1"
+chrono = { version = "0.4.44", features = ["serde"] }
+jsonwebtoken = { version = "10", features = ["aws_lc_rs"] }
 
 [dev-dependencies]
 tower = "0.5"

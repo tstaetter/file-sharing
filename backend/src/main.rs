@@ -1,15 +1,17 @@
+use anyhow::Context;
 use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
 use aws_sdk_s3::error::ProvideErrorMetadata;
 use aws_sdk_s3::types::{CorsConfiguration, CorsRule};
 use aws_sdk_s3::Client;
 use backend::*;
+use mongodb::Client as MongoClient;
 use std::env;
 use tokio::signal;
 use tracing::{info, warn};
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     // eprintln goes to stderr and is visible even before tracing is initialised.
     // This confirms the binary actually started executing.
     eprintln!("backend: process started, initialising...");
@@ -43,10 +45,11 @@ async fn main() {
     info!("Backend starting up...");
 
     // Validate required environment variables early
-    let account_id = env::var("R2_ACCOUNT_ID").expect("R2_ACCOUNT_ID must be set");
-    let access_key = env::var("R2_ACCESS_KEY_ID").expect("R2_ACCESS_KEY_ID must be set");
-    let secret_key = env::var("R2_SECRET_ACCESS_KEY").expect("R2_SECRET_ACCESS_KEY must be set");
-    let bucket = env::var("R2_BUCKET").expect("R2_BUCKET must be set");
+    let account_id = env::var("R2_ACCOUNT_ID").context("R2_ACCOUNT_ID must be set")?;
+    let access_key = env::var("R2_ACCESS_KEY_ID").context("R2_ACCESS_KEY_ID must be set")?;
+    let secret_key =
+        env::var("R2_SECRET_ACCESS_KEY").context("R2_SECRET_ACCESS_KEY must be set")?;
+    let bucket = env::var("R2_BUCKET").context("R2_BUCKET must be set")?;
 
     info!(
         bucket = %bucket,
@@ -117,8 +120,21 @@ async fn main() {
             }
         }
     });
+    // Database setup
+    let mongo_uri =
+        std::env::var("MONGODB_URI").unwrap_or_else(|_| "mongodb://localhost:27017".to_string());
+    let client = MongoClient::with_uri_str(&mongo_uri)
+        .await
+        .context("Failed to connect to MongoDB")?;
+    let database = Some(client.database("filez_zone_dev"));
 
-    let state = AppState { s3, bucket };
+    info!("Connected to MongoDB on {}", mongo_uri);
+
+    let state = AppState {
+        s3,
+        bucket,
+        database,
+    };
 
     // Koyeb sets PORT at runtime; fall back to 8000 for local dev
     let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());
@@ -126,7 +142,7 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
         .await
-        .expect("failed to bind TCP listener");
+        .context("failed to bind TCP listener")?;
 
     info!("Server listening on 0.0.0.0:{}, health at /health", port);
 
@@ -134,13 +150,16 @@ async fn main() {
     axum::serve(listener, app(state))
         .with_graceful_shutdown(shutdown_signal())
         .await
-        .expect("server error");
+        .context("server error")?;
 
     info!("Server shutting down gracefully");
 
     // Wait for the background CORS task to finish before exiting
     if let Err(err) = cors_task.await {
         warn!("CORS background task panicked: {:?}", err);
+        Ok(())
+    } else {
+        Ok(())
     }
 }
 
