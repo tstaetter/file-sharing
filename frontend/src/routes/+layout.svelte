@@ -98,6 +98,16 @@
 					Privacy
 				</a>
 
+				<!-- Saved URLs (authenticated users only) -->
+				{#if auth.isAuthenticated}
+					<a
+						href="/urls"
+						class="px-3 py-1.5 text-xs font-medium text-violet-600 hover:text-violet-800 hover:bg-violet-50 rounded-lg transition-colors"
+					>
+						Saved URLs
+					</a>
+				{/if}
+
 				<!-- Auth section -->
 				{#if auth.isAuthenticated && auth.user}
 					<!-- User menu -->
@@ -146,6 +156,13 @@
 									<p class="text-xs font-medium text-slate-700">{auth.user.name}</p>
 									<p class="text-[10px] text-slate-400">{auth.user.email}</p>
 								</div>
+								<a
+									href="/urls"
+									onclick={closeMenu}
+									class="block w-full text-left px-3 py-2 text-xs text-violet-600 hover:bg-violet-50 transition-colors cursor-pointer"
+								>
+									Saved URLs
+								</a>
 								<button
 									onclick={handleLogout}
 									class="w-full text-left px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"

@@ -2,12 +2,14 @@
 
 End-to-end encrypted file sharing with burn-after-reading downloads. Pick a file, get a link — the recipient downloads it once and it's gone forever. **Zero-knowledge architecture** ensures the server never sees your plaintext or encryption keys.
 
+Authenticated users can **save capability URLs** to their collection — links are automatically saved after upload and browsable in a paginated list view.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/GitHub-sha--zone%2Ffile--sharing-181717?logo=github)](https://github.com/sha-zone/file-sharing)
 
 ## How It Works
 
-1. **Uploader** picks a file in the browser. The frontend generates an AES-256-GCM key, encrypts the file chunk-by-chunk, and uploads the ciphertext directly to Cloudflare R2 via presigned URLs. A capability URL is produced with the decryption key embedded in the hash fragment — **the key never touches the server**.
+1. **Uploader** picks a file in the browser. The frontend generates an AES-256-GCM key, encrypts the file chunk-by-chunk, and uploads the ciphertext directly to Cloudflare R2 via presigned URLs. A capability URL is produced with the decryption key embedded in the hash fragment — **the key never touches the server**. If the user is authenticated, the capability URL is **auto-saved** to their collection.
 2. **Recipient** opens the link. The browser downloads the encrypted blob, decrypts it locally using the key from the URL hash, and saves the plaintext. The file is **deleted from R2 immediately** after the first download.
 3. **The server has zero knowledge.** Hash fragments are never transmitted over HTTP. Even if our infrastructure is compromised, your data remains unreadable.
 
@@ -16,14 +18,15 @@ Read more on our [Zero-Knowledge Encryption](https://www.filez.zone/zero-knowled
 ```
 Browser (encrypt)  ──►  Backend (presigned URLs)  ──►  Cloudflare R2 (encrypted bytes)
 Browser (decrypt)  ◄──  Backend (fetch & delete)   ◄──  Cloudflare R2 (encrypted bytes)
+Browser (save url) ──►  Backend (Bearer auth)      ──►  MongoDB (saved_urls)
 ```
 
 ## Project Structure
 
 | Sub-project | Path | Language | Description |
 |---|---|---|---|
-| Backend API | `backend/` | Rust (Axum) | Presigned URL generation, multipart upload, burn-after-read download, health endpoint, user auth (JWT + bcrypt + MongoDB) |
-| Frontend | `frontend/` | TypeScript (SvelteKit) | Upload UI, client-side encryption/decryption, capability URLs, zero-knowledge page, login/register with JWT auth |
+| Backend API | `backend/` | Rust (Axum) | Presigned URL generation, multipart upload, burn-after-read download, health endpoint, user auth (JWT + bcrypt + MongoDB), saved URLs with Bearer token middleware |
+| Frontend | `frontend/` | TypeScript (SvelteKit) | Upload UI, client-side encryption/decryption, capability URLs, zero-knowledge page, login/register with JWT auth, auto-save and paginated list view for saved URLs |
 | Cleanup Worker | `worker/cleanup-orphaned-uploads/` | Rust (standalone) | Background job that aborts orphaned multipart uploads older than 6 hours, runs via Supercronic on a schedule |
 
 ## Quick Start
@@ -34,7 +37,7 @@ Browser (decrypt)  ◄──  Backend (fetch & delete)   ◄──  Cloudflare R
 - **Frontend:** [Deno](https://deno.com/) 2.x or later
 - **Cleanup Worker:** Rust toolchain (stable)
 - **Storage:** A [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/) bucket with API credentials
-- **Database:** [MongoDB](https://www.mongodb.com/) (optional — only required for user accounts)
+- **Database:** [MongoDB](https://www.mongodb.com/) (optional — required for user accounts and saved URLs)
 
 ### Environment Variables
 
@@ -49,10 +52,19 @@ R2_BUCKET=<bucket name>
 
 Optionally set `RUST_LOG=info` for verbose logging.
 
-For user account features, also set:
+For user account and saved URL features, also set:
 
 ```env
-MONGODB_URI=<mongodb connection string>
+MONGODB_URI=mongodb://localhost:27017
+JWT_SECRET=<a random secret string for signing JWT tokens>
+JWT_EXPIRY_MINS=5
+```
+
+Create a `frontend/.env` file:
+
+```env
+PUBLIC_API_PREFIX=http://localhost:8000/v1
+PUBLIC_PREFIX=http://localhost:5173
 ```
 
 ### Start All Services
@@ -91,6 +103,8 @@ cargo run
 
 ## API Endpoints
 
+### File-sharing endpoints (no auth required)
+
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/health` | Health check — returns `{"status":"ok"}` |
@@ -99,26 +113,53 @@ cargo run
 | POST | `/v1/complete-upload` | Finalise multipart upload with ETags |
 | POST | `/v1/abort-upload` | Cancel an in-progress multipart upload |
 | GET | `/v1/f/:id` | Download encrypted blob and **delete from R2** |
+
+### Auth endpoints (token in request body)
+
+| Method | Path | Purpose |
+|---|---|---|
 | POST | `/v1/auth/register` | Create user account (returns JWT) |
 | POST | `/v1/auth/login` | Authenticate user (returns JWT) |
 | POST | `/v1/auth/delete` | Delete authenticated user's account |
 
+### Protected endpoints (Bearer auth required)
+
+| Method | Path | Purpose | Auth |
+|---|---|---|---|
+| POST | `/v1/urls` | Save a capability URL to the user's collection | `Authorization: Bearer <token>` |
+| GET | `/v1/urls` | List saved URLs with pagination (`?page=&per_page=`) | `Authorization: Bearer <token>` |
+
+Protected endpoints use the `require_auth` middleware which validates the JWT before the request reaches the handler. Unauthenticated requests receive `401 Unauthorized`.
+
 For full request/response schemas and curl examples, see [backend/README.md](backend/README.md).
 
-## User Accounts (optional)
+## User Accounts & Saved URLs (optional)
 
 filez.zone supports optional user accounts for managing shared files. Accounts are protected with:
 
 - **bcrypt** password hashing — no plaintext passwords are ever stored
-- **JWT tokens** (valid for 72 hours) for session management
-- **MongoDB** for persistent user storage
+- **JWT tokens** (expiry configurable via `JWT_EXPIRY_MINS`, default 5 minutes) for session management
+- **MongoDB** for persistent user storage and saved URL records
 
 The backend serves auth endpoints at `/v1/auth/register`, `/v1/auth/login`, and `/v1/auth/delete`. The frontend provides login and registration pages at `/login` and `/register`.
+
+Authenticated users automatically get their capability URLs saved after upload. Saved URLs can be browsed at `/urls` with pagination, copy-to-clipboard, and direct-open actions.
+
+### Authentication Architecture
+
+The project uses two authentication patterns:
+
+| Route group | Paths | Auth pattern |
+|---|---|---|
+| `auth_routes` | `/v1/auth/*` | Token in request body |
+| `protected_routes` | `/v1/urls` | `Authorization: Bearer <token>` header, validated by middleware |
+
+The frontend auth store (`src/lib/auth.svelte.ts`) persists JWT tokens in `localStorage` with automatic expiry detection and reactive state via Svelte 5 runes. Protected API calls in `src/lib/savedUrls.ts` send the token via the `Authorization: Bearer <token>` header.
 
 ## Encryption
 
 - **Algorithm:** AES-256-GCM
-- **Per-chunk IVs:** Each 5 MB chunk gets its own random 12-byte IV prepended to the ciphertext
+- **Per-chunk IVs:** Each 6 MB chunk gets its own random 12-byte IV prepended to the ciphertext
 - **Key distribution:** The symmetric key is embedded in the URL hash fragment (never sent to the server)
 - **Format:** Capability URLs follow the pattern `{base}/f/{uuid}#{url-safe-base64(key)}`
 - **Zero-knowledge proof:** The server stores and serves opaque encrypted blobs — it has no technical ability to decrypt them
@@ -144,7 +185,7 @@ We use [OpenPanel](https://openpanel.dev), a self-hosted, **cookieless** analyti
 ## Testing
 
 ```bash
-# Backend (cargo-nextest) — 74 of 75 tests pass
+# Backend (cargo-nextest) — 106 tests pass
 cd backend && cargo nextest run
 
 # Frontend (Vitest)
@@ -156,9 +197,9 @@ cd worker/cleanup-orphaned-uploads && cargo nextest run
 
 ## Further Reading
 
-- [AGENTS.md](AGENTS.md) — architecture diagrams, upload/download flows, conventions, and agent guidance
-- [backend/README.md](backend/README.md) — backend-specific setup, API details, and tech stack
-- [frontend/README.md](frontend/README.md) — frontend-specific setup, task reference, and how it works
+- [AGENTS.md](AGENTS.md) — architecture diagrams, upload/download/saved-urls flows, authentication architecture, conventions, and agent guidance
+- [backend/README.md](backend/README.md) — backend-specific setup, API details, auth middleware, saved URLs, and tech stack
+- [frontend/README.md](frontend/README.md) — frontend-specific setup, task reference, saved URLs page, auto-save, and how it works
 - [worker/cleanup-orphaned-uploads/README.md](worker/cleanup-orphaned-uploads/README.md) — worker-specific setup and configuration
 - [Zero-Knowledge Encryption](https://www.filez.zone/zero-knowledge) — how zero-knowledge architecture protects your files
 - [Privacy Policy](https://www.filez.zone/privacy) — how we handle your data

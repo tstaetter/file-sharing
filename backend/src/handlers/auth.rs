@@ -10,14 +10,14 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    sub: String, // email
-    exp: usize,
-    iat: usize,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: String, // email
+    pub exp: usize,
+    pub iat: usize,
 }
 
-fn create_token(email: &str) -> Result<String, AuthError> {
+pub fn create_token(email: &str) -> Result<String, AuthError> {
     dotenvy::dotenv().ok();
 
     let now = Utc::now();
@@ -39,7 +39,7 @@ fn create_token(email: &str) -> Result<String, AuthError> {
     .map_err(|e| AuthError::JwtToken(e.to_string()))
 }
 
-fn validate_token(token: &str) -> Result<Claims, AuthError> {
+pub fn validate_token(token: &str) -> Result<Claims, AuthError> {
     dotenvy::dotenv().ok();
 
     let secret = std::env::var("JWT_SECRET").expect("No JWT secret");

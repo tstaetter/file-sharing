@@ -2,6 +2,8 @@
 
 Browser-based UI for the file-sharing service. Built with **SvelteKit** and **Svelte 5** (runes mode), it encrypts files client-side with AES-256-GCM and uploads them directly to Cloudflare R2 via presigned URLs. Recipients open a capability URL with the decryption key embedded in the hash fragment — the key never touches the server.
 
+Authenticated users can save capability URLs to their collection — links are **auto-saved after upload** and browsable in a paginated list view.
+
 ## Quick Start
 
 ### Prerequisites
@@ -21,6 +23,7 @@ Create a `frontend/.env` file (or set the variable in your deployment environmen
 
 ```env
 PUBLIC_API_PREFIX=http://localhost:8000/v1
+PUBLIC_PREFIX=http://localhost:5173
 ```
 
 SvelteKit requires browser-accessible environment variables to be prefixed with `PUBLIC_`. They are imported in client-side code via `$env/static/public`:
@@ -28,6 +31,9 @@ SvelteKit requires browser-accessible environment variables to be prefixed with 
 ```typescript
 import { PUBLIC_API_PREFIX } from '$env/static/public';
 ```
+
+- `PUBLIC_API_PREFIX` — the backend API base URL (used by `upload.ts`, `savedUrls.ts`, and `f/[id]/+page.svelte`)
+- `PUBLIC_PREFIX` — the frontend base URL for building capability URLs
 
 Make sure the backend is running, or update `PUBLIC_API_PREFIX` if the backend is deployed elsewhere.
 
@@ -66,18 +72,27 @@ deno task test:watch
 deno task test:ui
 ```
 
-Test files live next to the modules they exercise (e.g., `src/lib/crypto.test.ts`).
+Test files live next to the modules they exercise (e.g., `src/lib/savedUrls.test.ts`).
 
 ## How It Works
 
 ### Upload (`/`)
 
-1. User selects a file.
-2. An AES-256-GCM key is generated, along with a random UUID as the file ID.
-3. The backend initiates a multipart upload (`POST /v1/create-upload`).
-4. The file is split into 5 MB chunks. Each chunk gets its own random 12-byte IV, is encrypted, and is uploaded directly to R2 via a presigned URL (`POST /v1/sign-parts`).
-5. ETags from each PUT are sent to the backend to complete the upload (`POST /v1/complete-upload`).
-6. A capability URL is built: `{base}/f/{fileId}#{url-safe-base64(key)}`.
+1. User selects a file via the file picker on `+page.svelte`.
+2. On click of "Encrypt & upload", `uploadFile()` in `src/lib/upload.ts` is called:
+   - Delegates to the `shazoneSDK` `uploadFile` function with the backend URL from `PUBLIC_API_PREFIX`.
+   - The SDK generates a 256-bit AES-GCM key and a random UUID as the `file_id`.
+   - Calls `POST /v1/create-upload` to initiate a multipart upload.
+   - Splits the file into 6 MiB chunks, encrypts each with a random IV.
+   - For each chunk, requests a presigned URL from `POST /v1/sign-parts` and PUTs the encrypted payload directly to R2.
+   - Collects ETags and finalises with `POST /v1/complete-upload`.
+3. Returns the raw AES key bytes and file ID.
+4. `createCapabilityUrl()` builds the shareable URL: `{PUBLIC_PREFIX}/f/{fileId}#{url-safe-base64(key)}`.
+5. **Auto-save (authenticated users only):** After a successful upload, if the user is logged in:
+   - Calls `saveUrl(link, file.name, auth.token)` from `src/lib/savedUrls.ts`.
+   - Uses the original filename as the URL title.
+   - Silently handles failures — the upload still succeeded, saving is a bonus.
+   - Shows inline feedback: "Saving link to your collection…" while in progress, then a "Saved to your collection" link to `/urls` on success.
 
 ### Download (`/f/[id]`)
 
@@ -85,6 +100,20 @@ Test files live next to the modules they exercise (e.g., `src/lib/crypto.test.ts
 2. The encrypted blob is fetched from the backend (`GET /v1/f/{id}`), which deletes the object from R2 immediately after serving.
 3. The blob is split back into per-chunk `IV + ciphertext` segments and decrypted with the Web Crypto API.
 4. Plaintext chunks are assembled into a Blob and triggered as a browser download.
+
+### Saved URLs (`/urls`)
+
+1. Authenticated users navigate to `/urls` (via the nav bar, user dropdown, or auto-save confirmation link).
+2. The page checks `auth.isAuthenticated` on mount — redirects to `/login` if not authenticated.
+3. Calls `listUrls(auth.token, page, perPage)` from `src/lib/savedUrls.ts` with the JWT in an `Authorization: Bearer <token>` header.
+4. Displays saved URLs in a paginated list with:
+   - **Title** (or truncated URL if no title was set).
+   - **Full URL** underneath when a title is present.
+   - **Formatted save date**.
+   - **Copy button** — copies the capability URL to clipboard with checkmark feedback.
+   - **Open button** — opens the link in a new tab.
+5. Supports pagination with Previous/Next buttons and page counter.
+6. Handles loading (spinner), empty (helpful message + upload CTA), and error (message with retry) states.
 
 ### Zero-Knowledge Architecture
 
@@ -104,13 +133,13 @@ filez.zone supports optional user accounts via JWT-based authentication:
 - **Auth store:** `src/lib/auth.svelte.ts` — reactive Svelte 5 runes providing `token`, `user`, `loading`, `error`, and `isAuthenticated` state, plus `signIn()`, `signUp()`, `signOut()`, and `deleteAccount()` actions
 - **Token storage:** JWTs persisted in `localStorage` with automatic expiry detection via JWT `exp` claim
 - **Pages:** `/login` and `/register` with client-side validation, error display, and automatic redirect when already authenticated
-- **API communication:** Uses `PUBLIC_API_PREFIX` to call backend `/v1/auth/*` endpoints
-- **Header UI:** Shows "Log in"/"Sign up" buttons when signed out; user avatar with dropdown menu (logout, delete account) when signed in
+- **API communication:** Auth endpoints use `PUBLIC_API_PREFIX` to call backend `/v1/auth/*` endpoints; protected endpoints (saved URLs) use `Authorization: Bearer <token>` header
+- **Header UI:** Shows "Log in"/"Sign up" buttons when signed out; user avatar with dropdown menu (Saved URLs, Log out, Delete account) and a "Saved URLs" nav link when signed in
 
 ### Encryption Model
 
 - **Algorithm:** AES-256-GCM.
-- **Per-chunk IVs:** Each 5 MB chunk gets a unique random 12-byte IV prepended to the ciphertext.
+- **Per-chunk IVs:** Each chunk gets a unique random 12-byte IV prepended to the ciphertext. Chunks can be decrypted independently.
 - **Key distribution:** The symmetric key is embedded in the URL hash fragment, which is never transmitted over HTTP.
 - **Backend opacity:** The backend stores and serves raw encrypted bytes. It never sees the key or plaintext.
 
@@ -123,25 +152,25 @@ src/
 ├── app.html                 ← HTML shell
 ├── lib/
 │   ├── auth.svelte.ts       ← Svelte 5 runes auth store (JWT, localStorage persistence, reactive state)
+│   ├── savedUrls.ts         ← API module for saved capability URLs (Bearer auth, paginated list)
 │   ├── index.ts             ← barrel export for $lib
-│   ├── chunk.ts             ← file chunking generator (5 MB chunks)
-│   ├── crypto.ts            ← AES-GCM key generation & per-chunk encryption
-│   ├── upload.ts            ← multipart upload orchestrator
-│   ├── wasm.ts              ← capability URL builder (URL-safe base64)
+│   ├── upload.ts            ← multipart upload orchestrator wrapper (binds PUBLIC_API_PREFIX to SDK)
 │   └── assets/
-│       └── favicon.svg
+│       └── logo.webp
 └── routes/
-    ├── +layout.svelte       ← root layout (header nav, footer, global CSS)
-    ├── +page.svelte         ← upload page (file picker, encrypt & upload)
+    ├── +layout.svelte       ← root layout (header nav with auth + saved URLs, footer, global CSS)
+    ├── +page.svelte         ← upload page (file picker, encrypt & upload, auto-save for auth users)
     ├── f/
     │   └── [id]/
     │       └── +page.svelte ← download page (fetch, decrypt, save)
+    ├── urls/
+    │   └── +page.svelte     ← saved URLs list page (paginated, copy, open — auth required)
     ├── health/
     │   └── +server.ts       ← health check endpoint (GET /health → {"status":"ok"})
     ├── login/
-    │   └── +page.svelte        ← login page with JWT auth
+    │   └── +page.svelte     ← login page with JWT auth
     ├── register/
-    │   └── +page.svelte        ← registration page
+    │   └── +page.svelte     ← registration page
     ├── zero-knowledge/
     │   └── +page.svelte     ← zero-knowledge architecture explanation
     ├── privacy/
@@ -154,12 +183,15 @@ src/
         └── +server.ts       ← dynamic sitemap generation
 ```
 
+The SDK logic (encryption, chunking, capability URL building) lives in `packages/shazoneSDK/` and is imported as a workspace dependency.
+
 ## Pages
 
 | Route | Description |
 |---|---|
-| `/` | Upload page — pick a file, encrypt, and upload with progress bar |
+| `/` | Upload page — pick a file, encrypt, and upload with progress bar and auto-save for authenticated users |
 | `/f/[id]` | Download page — decrypt and save file after burn-after-read fetch |
+| `/urls` | Saved URLs — paginated list of saved capability URLs (auth required) |
 | `/health` | Koyeb health check — returns `{"status":"ok"}` with HTTP 200 |
 | `/zero-knowledge` | Educational page explaining zero-knowledge encryption architecture |
 | `/privacy` | Privacy policy — data collection, encryption, third-party services |
@@ -167,6 +199,35 @@ src/
 | `/login` | Login page — email/password form with JWT token storage in localStorage |
 | `/register` | Registration page — name/email/password with client-side validation |
 | `/tos` | Terms of service |
+
+## API Contract with Backend
+
+The frontend reads the backend base URL from `PUBLIC_API_PREFIX` in `$env/static/public` (set in `.env`). The upload wrapper, the download page, and the saved URLs module all use this variable.
+
+### File-sharing endpoints (no auth required)
+
+| Method | Endpoint            | Used in                  | Purpose                             |
+|--------|---------------------|--------------------------|-------------------------------------|
+| POST   | `/v1/create-upload`    | `upload.ts` (SDK)        | Initiate multipart upload           |
+| POST   | `/v1/sign-parts`       | `upload.ts` (SDK)        | Get presigned URLs for parts        |
+| POST   | `/v1/complete-upload`  | `upload.ts` (SDK)        | Finalise multipart upload           |
+| POST   | `/v1/abort-upload`     | `upload.ts` (SDK)        | Cancel multipart upload             |
+| GET    | `/v1/f/:id`            | `f/[id]/+page.svelte`    | Fetch encrypted blob (burn-after-read) |
+
+### Auth endpoints (token in request body)
+
+| Method | Endpoint            | Used in                  | Purpose                             |
+|--------|---------------------|--------------------------|-------------------------------------|
+| POST   | `/v1/auth/register`    | `auth.svelte.ts`         | Register new user                   |
+| POST   | `/v1/auth/login`       | `auth.svelte.ts`         | Authenticate and get JWT            |
+| POST   | `/v1/auth/delete`      | `auth.svelte.ts`         | Delete user account                 |
+
+### Protected endpoints (Bearer auth required)
+
+| Method | Endpoint            | Used in                  | Purpose                             | Auth Header                        |
+|--------|---------------------|--------------------------|-------------------------------------|------------------------------------|
+| POST   | `/v1/urls`             | `savedUrls.ts`           | Save a capability URL               | `Authorization: Bearer <token>`    |
+| GET    | `/v1/urls`             | `savedUrls.ts`           | List saved URLs (paginated)         | `Authorization: Bearer <token>`    |
 
 ## Analytics
 
@@ -201,7 +262,7 @@ Key deployment configuration:
 | Linting         | [ESLint 10](https://eslint.org/) + typescript-eslint |
 | Formatting      | [Prettier 3](https://prettier.io/) + prettier-plugin-svelte |
 | Analytics       | [OpenPanel](https://openpanel.dev) (self-hosted, cookieless) |
-| Auth            | JWT tokens, localStorage persistence               |
+| Auth            | JWT tokens, localStorage persistence, Bearer header auth |
 | Deployment      | [Koyeb](https://www.koyeb.com/)                     |
 
 See [AGENTS.md](AGENTS.md) for detailed conventions, design decisions, and agent guidance.
