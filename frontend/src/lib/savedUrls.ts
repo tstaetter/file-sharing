@@ -94,3 +94,45 @@ export async function listUrls(
 
 	return res.json() as Promise<ListUrlsResponse>;
 }
+
+/**
+ * PUT /v1/check-file
+ *
+ * Checks whether a file still exists in storage (has not been consumed
+ * by a burn-after-read download). This does NOT require authentication.
+ *
+ * @param key  The file ID (UUID) extracted from the capability URL path.
+ * @returns `true` if the file still exists, `false` if it has been
+ *          consumed or was never uploaded.
+ */
+export async function checkFile(key: string): Promise<boolean> {
+	const res = await fetch(`${PUBLIC_API_PREFIX}/check-file`, {
+		method: 'PUT',
+		headers: {
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({ key })
+	});
+
+	return res.ok;
+}
+
+/**
+ * Extracts the file ID (UUID) from a capability URL.
+ *
+ * Capability URLs have the form `https://example.com/f/{uuid}#key`.
+ * The hash fragment is never sent to the server, so `URL.pathname`
+ * naturally gives us `/f/{uuid}`.
+ *
+ * @param url  A capability URL (e.g. `"https://filez.zone/f/abc-123-def#key"`).
+ * @returns The file UUID, or `null` if the URL does not match the expected format.
+ */
+export function extractFileId(url: string): string | null {
+	try {
+		const parsed = new URL(url);
+		const match = parsed.pathname.match(/^\/f\/([0-9a-f-]+)$/i);
+		return match ? match[1] : null;
+	} catch {
+		return null;
+	}
+}
