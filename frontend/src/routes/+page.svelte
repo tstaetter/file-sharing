@@ -2,6 +2,8 @@
 	import { uploadFile } from '$lib/upload';
 	import { createCapabilityUrl } from '$lib';
 	import { PUBLIC_PREFIX } from '$env/static/public';
+	import { auth } from '$lib/auth.svelte';
+	import { saveUrl } from '$lib/savedUrls';
 	import logo from '$lib/assets/logo.webp';
 
 	let file = $state<File | undefined>(undefined);
@@ -9,6 +11,8 @@
 	let uploading = $state(false);
 	let fileName = $state('');
 	let progress = $state(0);
+	let saving = $state(false);
+	let saved = $state(false);
 
 	function handleFile(e: Event) {
 		const f = (e.target as HTMLInputElement).files?.[0];
@@ -20,9 +24,24 @@
 		if (!file) return;
 		uploading = true;
 		progress = 0;
+		saved = false;
 		try {
 			const { raw, fileId } = await uploadFile(file, (p) => (progress = p));
 			link = await createCapabilityUrl(PUBLIC_PREFIX, fileId, raw);
+
+			// Auto-save the URL for authenticated users
+			if (auth.isAuthenticated && auth.token) {
+				saving = true;
+				try {
+					await saveUrl(link, file.name, auth.token);
+					saved = true;
+				} catch {
+					// Silently fail — the upload still succeeded, saving is a bonus
+					saved = false;
+				} finally {
+					saving = false;
+				}
+			}
 		} finally {
 			uploading = false;
 		}
@@ -218,6 +237,33 @@
 						>ATTENTION:</span
 					> Once the link is opened, the file gets deleted from our servers
 				</p>
+
+				<!-- Auto-save feedback for authenticated users -->
+				{#if auth.isAuthenticated}
+					<div class="mt-3 pt-3 border-t border-cyan-200/50">
+						{#if saving}
+							<p class="text-[10px] text-cyan-500">Saving link to your collection…</p>
+						{:else if saved}
+							<div class="flex items-center gap-1.5">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									class="w-3 h-3 text-violet-500"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+								</svg>
+								<p class="text-[10px] text-violet-600">
+									Saved to <a href="/urls" class="underline hover:text-violet-800"
+										>your collection</a
+									>
+								</p>
+							</div>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
