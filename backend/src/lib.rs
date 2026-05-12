@@ -1,6 +1,8 @@
+mod db;
 mod handlers;
 mod routes;
 
+pub use db::*;
 pub use handlers::*;
 pub use routes::app;
 
