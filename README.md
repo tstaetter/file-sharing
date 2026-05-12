@@ -22,8 +22,8 @@ Browser (decrypt)  ◄──  Backend (fetch & delete)   ◄──  Cloudflare R
 
 | Sub-project | Path | Language | Description |
 |---|---|---|---|
-| Backend API | `backend/` | Rust (Axum) | Presigned URL generation, multipart upload orchestration, burn-after-read download, health endpoint |
-| Frontend | `frontend/` | TypeScript (SvelteKit) | Upload UI, client-side AES-256-GCM encryption/decryption, capability URL handling, zero-knowledge info page |
+| Backend API | `backend/` | Rust (Axum) | Presigned URL generation, multipart upload, burn-after-read download, health endpoint, user auth (JWT + bcrypt + MongoDB) |
+| Frontend | `frontend/` | TypeScript (SvelteKit) | Upload UI, client-side encryption/decryption, capability URLs, zero-knowledge page, login/register with JWT auth |
 | Cleanup Worker | `worker/cleanup-orphaned-uploads/` | Rust (standalone) | Background job that aborts orphaned multipart uploads older than 6 hours, runs via Supercronic on a schedule |
 
 ## Quick Start
@@ -34,6 +34,7 @@ Browser (decrypt)  ◄──  Backend (fetch & delete)   ◄──  Cloudflare R
 - **Frontend:** [Deno](https://deno.com/) 2.x or later
 - **Cleanup Worker:** Rust toolchain (stable)
 - **Storage:** A [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/) bucket with API credentials
+- **Database:** [MongoDB](https://www.mongodb.com/) (optional — only required for user accounts)
 
 ### Environment Variables
 
@@ -47,6 +48,12 @@ R2_BUCKET=<bucket name>
 ```
 
 Optionally set `RUST_LOG=info` for verbose logging.
+
+For user account features, also set:
+
+```env
+MONGODB_URI=<mongodb connection string>
+```
 
 ### Start All Services
 
@@ -92,8 +99,21 @@ cargo run
 | POST | `/v1/complete-upload` | Finalise multipart upload with ETags |
 | POST | `/v1/abort-upload` | Cancel an in-progress multipart upload |
 | GET | `/v1/f/:id` | Download encrypted blob and **delete from R2** |
+| POST | `/v1/auth/register` | Create user account (returns JWT) |
+| POST | `/v1/auth/login` | Authenticate user (returns JWT) |
+| POST | `/v1/auth/delete` | Delete authenticated user's account |
 
 For full request/response schemas and curl examples, see [backend/README.md](backend/README.md).
+
+## User Accounts (optional)
+
+filez.zone supports optional user accounts for managing shared files. Accounts are protected with:
+
+- **bcrypt** password hashing — no plaintext passwords are ever stored
+- **JWT tokens** (valid for 72 hours) for session management
+- **MongoDB** for persistent user storage
+
+The backend serves auth endpoints at `/v1/auth/register`, `/v1/auth/login`, and `/v1/auth/delete`. The frontend provides login and registration pages at `/login` and `/register`.
 
 ## Encryption
 
@@ -124,7 +144,7 @@ We use [OpenPanel](https://openpanel.dev), a self-hosted, **cookieless** analyti
 ## Testing
 
 ```bash
-# Backend (cargo-nextest)
+# Backend (cargo-nextest) — 74 of 75 tests pass
 cd backend && cargo nextest run
 
 # Frontend (Vitest)

@@ -97,6 +97,16 @@ Key properties:
 - **Direct-to-storage uploads:** Encrypted chunks are PUT directly to Cloudflare R2 via presigned URLs. File data never passes through the backend.
 - **Burn after reading:** Files are permanently deleted from R2 after the first download. There is no second chance.
 
+### User Authentication
+
+filez.zone supports optional user accounts via JWT-based authentication:
+
+- **Auth store:** `src/lib/auth.svelte.ts` — reactive Svelte 5 runes providing `token`, `user`, `loading`, `error`, and `isAuthenticated` state, plus `signIn()`, `signUp()`, `signOut()`, and `deleteAccount()` actions
+- **Token storage:** JWTs persisted in `localStorage` with automatic expiry detection via JWT `exp` claim
+- **Pages:** `/login` and `/register` with client-side validation, error display, and automatic redirect when already authenticated
+- **API communication:** Uses `PUBLIC_API_PREFIX` to call backend `/v1/auth/*` endpoints
+- **Header UI:** Shows "Log in"/"Sign up" buttons when signed out; user avatar with dropdown menu (logout, delete account) when signed in
+
 ### Encryption Model
 
 - **Algorithm:** AES-256-GCM.
@@ -112,6 +122,7 @@ src/
 ├── app.d.ts                 ← ambient type declarations
 ├── app.html                 ← HTML shell
 ├── lib/
+│   ├── auth.svelte.ts       ← Svelte 5 runes auth store (JWT, localStorage persistence, reactive state)
 │   ├── index.ts             ← barrel export for $lib
 │   ├── chunk.ts             ← file chunking generator (5 MB chunks)
 │   ├── crypto.ts            ← AES-GCM key generation & per-chunk encryption
@@ -127,6 +138,10 @@ src/
     │       └── +page.svelte ← download page (fetch, decrypt, save)
     ├── health/
     │   └── +server.ts       ← health check endpoint (GET /health → {"status":"ok"})
+    ├── login/
+    │   └── +page.svelte        ← login page with JWT auth
+    ├── register/
+    │   └── +page.svelte        ← registration page
     ├── zero-knowledge/
     │   └── +page.svelte     ← zero-knowledge architecture explanation
     ├── privacy/
@@ -149,6 +164,8 @@ src/
 | `/zero-knowledge` | Educational page explaining zero-knowledge encryption architecture |
 | `/privacy` | Privacy policy — data collection, encryption, third-party services |
 | `/cookies` | Cookie policy — minimal browser storage, cookieless analytics |
+| `/login` | Login page — email/password form with JWT token storage in localStorage |
+| `/register` | Registration page — name/email/password with client-side validation |
 | `/tos` | Terms of service |
 
 ## Analytics
@@ -184,6 +201,7 @@ Key deployment configuration:
 | Linting         | [ESLint 10](https://eslint.org/) + typescript-eslint |
 | Formatting      | [Prettier 3](https://prettier.io/) + prettier-plugin-svelte |
 | Analytics       | [OpenPanel](https://openpanel.dev) (self-hosted, cookieless) |
+| Auth            | JWT tokens, localStorage persistence               |
 | Deployment      | [Koyeb](https://www.koyeb.com/)                     |
 
 See [AGENTS.md](AGENTS.md) for detailed conventions, design decisions, and agent guidance.

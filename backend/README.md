@@ -4,6 +4,8 @@ Backend API for the file-sharing service. Built with **Rust** and **Axum**, it g
 
 The backend never sees plaintext — all encryption and decryption happens client-side in the browser. It stores and serves opaque ciphertext only.
 
+The backend also supports optional user accounts with bcrypt password hashing, JWT authentication, and MongoDB storage.
+
 ## Quick Start
 
 ### Prerequisites
@@ -11,6 +13,7 @@ The backend never sees plaintext — all encryption and decryption happens clien
 - Rust toolchain (stable)
 - [cargo-nextest](https://nexte.st/) (`cargo install cargo-nextest`)
 - A Cloudflare R2 bucket with API credentials
+- [MongoDB](https://www.mongodb.com/) (optional — only needed for user accounts)
 
 ### Environment Variables
 
@@ -21,6 +24,12 @@ R2_ACCOUNT_ID=<cloudflare account id>
 R2_ACCESS_KEY_ID=<r2 access key>
 R2_SECRET_ACCESS_KEY=<r2 secret key>
 R2_BUCKET=<bucket name>
+```
+
+Optionally add for user account features:
+
+```env
+MONGODB_URI=<mongodb connection string>
 ```
 
 Optionally set `RUST_LOG` for log verbosity:
@@ -49,6 +58,9 @@ All endpoints accept and return JSON unless otherwise noted.
 | POST | `/v1/complete-upload` | Finalise multipart upload with ETags. |
 | POST | `/v1/abort-upload` | Cancel an in-progress multipart upload. |
 | GET | `/v1/f/:id` | Download encrypted blob. **Deletes object from R2 after reading.** |
+| POST | `/v1/auth/register` | Register a new user. Accepts `{email, password, name}`, returns `{token, user}`. |
+| POST | `/v1/auth/login` | Authenticate. Accepts `{email, password}`, returns `{token, user}`. |
+| POST | `/v1/auth/delete` | Delete account. Accepts `{token}`. Requires valid JWT. |
 
 The `/health` endpoint is used by Koyeb (and other orchestrators) to determine if the service is healthy. It runs outside the `/v1` prefix and does not require CORS.
 
@@ -85,10 +97,28 @@ curl http://localhost:8000/v1/f/abc123 --output file.enc
 
 Returns the raw encrypted binary stream. The file is permanently deleted from R2 immediately after this request succeeds. Any subsequent request returns 404.
 
+### Example: Register
+
+```bash
+curl -X POST http://localhost:8000/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"secure-password","name":"Alice"}'
+# → {"token":"eyJ...","user":{"email":"user@example.com","name":"Alice"}}
+```
+
+### Example: Login
+
+```bash
+curl -X POST http://localhost:8000/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"secure-password"}'
+# → {"token":"eyJ...","user":{"email":"user@example.com","name":"Alice"}}
+```
+
 ## Testing
 
 ```bash
-# Run all tests
+# Run all tests (74 of 75 pass — one pre-existing S3 mock issue)
 cargo nextest run
 
 # Run a specific test
@@ -106,6 +136,7 @@ src/
 ├── lib.rs         → AppState, re-exports
 ├── routes.rs      → Axum router definition (/health + /v1/*)
 └── handlers/
+    ├── auth.rs               → POST /v1/auth/* — register, login, delete user
     ├── health.rs          → GET /health — orchestrator health check
     ├── create_upload.rs   → POST /v1/create-upload
     ├── sign_parts.rs      → POST /v1/sign-parts
@@ -143,6 +174,8 @@ Key deployment configuration:
 | Serialization | `serde` + `serde_json` |
 | Env vars | `dotenvy` |
 | Init process | `tini` (in Docker) |
+| Auth | `bcrypt`, `jsonwebtoken` 9.x |
+| Database | `mongodb` 3.x |
 | Deployment | `Koyeb` |
 
 See [AGENTS.md](AGENTS.md) for detailed conventions, design decisions, and agent guidance.

@@ -8,8 +8,8 @@ The repo contains three sub-projects:
 
 | Sub-project | Path          | Language      | Description                                      |
 |-------------|---------------|---------------|--------------------------------------------------|
-| Backend API | `backend/`    | Rust (Axum)   | Presigned URL generation, multipart orchestration, burn-after-read download |
-| Frontend    | `frontend/`   | TypeScript (SvelteKit) | Upload UI, client-side encryption/decryption, capability URL handling |
+| Backend API | `backend/`    | Rust (Axum)   | Presigned URL generation, multipart upload, burn-after-read download, user auth (JWT + bcrypt + MongoDB) |
+| Frontend    | `frontend/`   | TypeScript (SvelteKit) | Upload UI, client-side encryption/decryption, capability URLs, login/register with JWT auth |
 | Workers    | `worker/`     | Rust (standalone) | Background maintenance jobs (e.g. orphaned upload cleanup) |
 
 Each sub-project has its own `AGENTS.md` with detailed setup, testing, and contribution guidance:
@@ -158,6 +158,22 @@ For language-specific setup, testing commands, code conventions, and contributio
 - **[worker/AGENTS.md](worker/AGENTS.md)** — Rust standalone workers, S3/R2 client, cleanup jobs, Docker deployment
 
 ## Common Cross-Cutting Tasks
+
+
+### AppState
+
+The backend uses `AppState` to hold shared state passed to all handlers via Axum extractors:
+
+```rust
+#[derive(Clone)]
+pub struct AppState {
+    pub s3: Client,                        // R2/S3 client for presigned URLs and object operations
+    pub bucket: String,                    // R2 bucket name
+    pub database: Option<mongodb::Database>, // MongoDB handle for user accounts (optional)
+}
+```
+
+The `database` field is an `Option` — when `None`, auth endpoints return errors but all file-sharing operations continue to work normally. This allows the service to run without MongoDB for deployments that don't need user accounts.
 
 ### Adding a feature that touches both frontend and backend
 
