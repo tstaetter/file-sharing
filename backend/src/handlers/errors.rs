@@ -47,6 +47,15 @@ pub enum CreateUploadError {
     ResponseBuilder(String),
 }
 
+impl IntoResponse for CreateUploadError {
+    fn into_response(self) -> Response {
+        let status = match &self {
+            Self::ResponseBuilder(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        (status, self.to_string()).into_response()
+    }
+}
+
 impl IntoResponse for SignPartsError {
     fn into_response(self) -> Response {
         let status = match &self {
