@@ -13,11 +13,31 @@
 	let progress = $state(0);
 	let saving = $state(false);
 	let saved = $state(false);
+	let dragOver = $state(false);
 
 	function handleFile(e: Event) {
 		const f = (e.target as HTMLInputElement).files?.[0];
 		file = f;
 		fileName = f?.name ?? '';
+	}
+
+	function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		dragOver = false;
+		const f = e.dataTransfer?.files?.[0];
+		if (f) {
+			file = f;
+			fileName = f.name;
+		}
+	}
+
+	function handleDragOver(e: DragEvent) {
+		e.preventDefault();
+		dragOver = true;
+	}
+
+	function handleDragLeave() {
+		dragOver = false;
 	}
 
 	async function upload() {
@@ -112,9 +132,14 @@
 			class="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-xl transition-all duration-200
 					{uploading
 				? 'border-slate-200 bg-slate-50/50 opacity-50 cursor-not-allowed'
-				: file
-					? 'border-violet-300 bg-violet-50/50 cursor-pointer'
-					: 'border-slate-200 bg-slate-50/50 cursor-pointer hover:border-slate-300 hover:bg-slate-100/50'}"
+				: dragOver
+					? 'border-violet-400 bg-violet-100/70 cursor-copy'
+					: file
+						? 'border-violet-300 bg-violet-50/50 cursor-pointer'
+						: 'border-slate-200 bg-slate-50/50 cursor-pointer hover:border-slate-300 hover:bg-slate-100/50'}"
+			ondragover={handleDragOver}
+			ondragleave={handleDragLeave}
+			ondrop={handleDrop}
 		>
 			<div class="flex flex-col items-center gap-2">
 				{#if fileName}
