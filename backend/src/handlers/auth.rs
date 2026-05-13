@@ -1,6 +1,7 @@
 use crate::db::user::User;
 use crate::handlers::errors::AuthError;
 use crate::AppState;
+use crate::middleware::AuthUser;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -80,10 +81,6 @@ pub struct LoginResponse {
     pub user: UserResponse,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct DeleteRequest {
-    pub token: String,
-}
 
 #[derive(Debug, Serialize)]
 pub struct UserResponse {
@@ -198,23 +195,21 @@ pub async fn login(
 
 /// Delete the authenticated user's account.
 ///
-/// Requires a valid JWT token. Deletes the user document from the database.
-/// This is irreversible.
+/// Requires a valid `Authorization: Bearer <token>` header (enforced by
+/// the `require_auth` middleware). The user is identified by the email
+/// in the validated token's `sub` claim.
 pub async fn delete_user(
+    auth_user: AuthUser,
     State(state): State<AppState>,
-    Json(req): Json<DeleteRequest>,
 ) -> Result<StatusCode, AuthError> {
-    // Validate token and extract email
-    let claims = validate_token(&req.token)?;
-
-    // Delete user from database
+    // Delete user from database (email comes from the validated JWT)
     let db = state
         .database
         .as_ref()
         .ok_or(AuthError::Database("no database configured".into()))?;
     let collection = db.collection::<User>("users");
     let result = collection
-        .delete_one(doc! { "email": &claims.sub })
+        .delete_one(doc! { "email": &auth_user.claims.sub })
         .await
         .map_err(|e| AuthError::Database(e.to_string()))?;
 
@@ -339,12 +334,6 @@ mod tests {
         serde_json::from_str::<LoginRequest>(json).unwrap_err();
     }
 
-    #[test]
-    fn test_delete_request_deserializes() {
-        let json = r#"{"token":"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhQGLC5jb21mIn0.rsa"}"#;
-        let req: DeleteRequest = serde_json::from_str(json).unwrap();
-        assert!(req.token.starts_with("eyJ"));
-    }
 
     // ── Unit tests: Error types ───────────────────────────────────────
 

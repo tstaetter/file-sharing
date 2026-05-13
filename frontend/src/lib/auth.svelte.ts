@@ -162,7 +162,12 @@ export function createAuth() {
 		loading = true;
 		error = null;
 		try {
-			const res = await apiPost('/delete', { token });
+			const res = await fetch(`${PUBLIC_API_PREFIX}/delete`, {
+				method: 'DELETE',
+				headers: {
+					Authorization: `Bearer ${token}`
+				}
+			});
 			if (!res.ok) {
 				const body = await res.text();
 				throw new Error(body || `Delete failed (${res.status})`);
