@@ -137,7 +137,6 @@ All endpoints are served under `http://localhost:8000/` and accept/return JSON u
 |--------|--------------------|--------------------------------------------------------------|---------------------------------|------------------------|
 | POST   | `/v1/auth/register`   | Register a new user. Returns JWT token and user info.      | `RegisterRequest`              | `RegisterResponse`     |
 | POST   | `/v1/auth/login`      | Authenticate. Returns JWT token and user info.              | `LoginRequest`                 | `LoginResponse`        |
-| POST   | `/v1/auth/delete`     | Delete the authenticated user's account.                    | `DeleteRequest`                | (empty 200)            |
 
 ### Protected endpoints (Bearer auth required)
 
@@ -147,6 +146,7 @@ These routes require a valid JWT in the `Authorization: Bearer <token>` header. 
 |--------|--------------------|--------------------------------------------------------------|---------------------------------|------------------------|
 | POST   | `/v1/urls`            | Save a capability URL to the authenticated user's collection. | `SaveUrlRequest { url, title }` | `SaveUrlResponse`      |
 | GET    | `/v1/urls`            | List the authenticated user's saved URLs (paginated).         | Query params: `page`, `per_page` | `ListUrlsResponse`     |
+| DELETE | `/v1/delete`          | Delete the authenticated user's account (204 No Content).    | —                              | (empty 204)            |
 
 Refer to the handler source files for the exact struct definitions. All request/response types derive `serde::Serialize` and/or `serde::Deserialize`.
 
@@ -217,24 +217,24 @@ Authenticated users can save capability URLs to their collection. The `save_url`
 - Use `tracing::info!`, `tracing::warn!`, and `tracing::error!` for logging. Avoid `println!` in production code.
 - The `AppState` struct (containing the S3 client, bucket name, and optional MongoDB database) is managed as Axum state (`axum::extract::State`). It must remain `Clone`.
 - **Route groups:** The router is organised into three groups:
-  - `auth_routes` — `/v1/auth/*` (register, login, delete) — authenticated via explicit token in request body
-  - `protected_routes` — `/v1/urls` (save, list) — authenticated via `Authorization: Bearer <token>` header middleware
+  - `auth_routes` — `/v1/auth/*` (register, login) — authenticated via explicit token in request body
+  - `protected_routes` — `/v1/urls` (save, list), `/v1/delete` (delete account) — authenticated via `Authorization: Bearer <token>` header middleware
   - Unprotected routes — `/v1/create-upload`, `/v1/sign-parts`, etc. — no authentication required
 
 ## Route Organisation Pattern
 
 ```rust
 pub fn app(state: AppState) -> Router {
-    // Auth routes — token passed in request body (login/register/delete)
+    // Auth routes — token passed in request body (login/register)
     let auth_routes = Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
-        .route("/delete", post(delete_user))
         .with_state(state.clone());
 
     // Protected routes — token validated via Bearer auth middleware
     let protected_routes = Router::new()
         .route("/urls", post(save_url).get(list_urls))
+        .route("/delete", delete(delete_user))
         .layer(middleware::from_fn(require_auth));
 
     // All v1 routes

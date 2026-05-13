@@ -121,7 +121,6 @@ cargo run
 |---|---|---|
 | POST | `/v1/auth/register` | Create user account (returns JWT) |
 | POST | `/v1/auth/login` | Authenticate user (returns JWT) |
-| POST | `/v1/auth/delete` | Delete authenticated user's account |
 
 ### Protected endpoints (Bearer auth required)
 
@@ -129,6 +128,7 @@ cargo run
 |---|---|---|---|
 | POST | `/v1/urls` | Save a capability URL to the user's collection | `Authorization: Bearer <token>` |
 | GET | `/v1/urls` | List saved URLs with pagination (`?page=&per_page=`) | `Authorization: Bearer <token>` |
+| DELETE | `/v1/delete` | Delete authenticated user's account | `Authorization: Bearer <token>` |
 
 Protected endpoints use the `require_auth` middleware which validates the JWT before the request reaches the handler. Unauthenticated requests receive `401 Unauthorized`.
 
@@ -142,7 +142,7 @@ filez.zone supports optional user accounts for managing shared files. Accounts a
 - **JWT tokens** (expiry configurable via `JWT_EXPIRY_MINS`, default 5 minutes) for session management
 - **MongoDB** for persistent user storage and saved URL records
 
-The backend serves auth endpoints at `/v1/auth/register`, `/v1/auth/login`, and `/v1/auth/delete`. The frontend provides login and registration pages at `/login` and `/register`.
+The backend serves auth endpoints at `/v1/auth/register` and `/v1/auth/login`. Account deletion is handled at `DELETE /v1/delete` with Bearer token authentication. The frontend provides login and registration pages at `/login` and `/register`.
 
 Authenticated users automatically get their capability URLs saved after upload. Saved URLs can be browsed at `/urls` with pagination, copy-to-clipboard, and direct-open actions. Each saved URL is checked against storage to show an **"Already used" badge** when the file has been consumed by a burn-after-read download.
 

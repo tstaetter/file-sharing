@@ -220,7 +220,7 @@ Set `PUBLIC_API_PREFIX` in `frontend/.env` (or your deployment environment) to p
 | PUT    | `/v1/check-file`     | None                          | Check if a file still exists in storage   |
 | POST   | `/v1/auth/register`   | None                          | Register new user                       |
 | POST   | `/v1/auth/login`      | None                          | Authenticate, get JWT                   |
-| POST   | `/v1/auth/delete`     | Token in body                 | Delete user account                     |
+| DELETE | `/v1/delete`           | `Authorization: Bearer <token>` | Delete user account (204 No Content)   |
 | POST   | `/v1/urls`            | `Authorization: Bearer <token>` | Save a capability URL                   |
 | GET    | `/v1/urls`            | `Authorization: Bearer <token>` | List saved URLs (paginated)             |
 
@@ -255,16 +255,16 @@ The backend router is organised into three groups with different authentication 
 
 ```rust
 pub fn app(state: AppState) -> Router {
-    // Auth routes — token passed in request body (for login/register/delete)
+    // Auth routes — token passed in request body (for login/register)
     let auth_routes = Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
-        .route("/delete", post(delete_user))
         .with_state(state.clone());
 
     // Protected routes — token validated via Bearer auth middleware
     let protected_routes = Router::new()
         .route("/urls", post(save_url).get(list_urls))
+        .route("/delete", delete(delete_user))
         .layer(middleware::from_fn(require_auth));
 
     // Unprotected routes — no authentication required

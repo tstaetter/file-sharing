@@ -263,7 +263,6 @@ The frontend reads the backend base URL from `PUBLIC_API_PREFIX` in `$env/static
 |--------|---------------------|--------------------------|-------------------------------------|
 | POST   | `/v1/auth/register`    | `auth.svelte.ts`         | Register new user                   |
 | POST   | `/v1/auth/login`       | `auth.svelte.ts`         | Authenticate and get JWT            |
-| POST   | `/v1/auth/delete`      | `auth.svelte.ts`         | Delete user account                 |
 
 ### Protected endpoints (Bearer auth required)
 
@@ -271,6 +270,7 @@ The frontend reads the backend base URL from `PUBLIC_API_PREFIX` in `$env/static
 |--------|---------------------|--------------------------|-------------------------------------|------------------------------------|
 | POST   | `/v1/urls`             | `savedUrls.ts`           | Save a capability URL               | `Authorization: Bearer <token>`    |
 | GET    | `/v1/urls`             | `savedUrls.ts`           | List saved URLs (paginated)         | `Authorization: Bearer <token>`    |
+| DELETE | `/v1/delete`           | `auth.svelte.ts`         | Delete user account                 | `Authorization: Bearer <token>`    |
 
 Refer to `backend/AGENTS.md` for the request/response schemas.
 
