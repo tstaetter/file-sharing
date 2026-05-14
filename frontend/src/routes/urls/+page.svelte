@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { localUrls, checkFile, extractFileId, type LocalUrlItem } from '$lib/savedUrls.svelte';
+	import { resolve } from '$app/paths';
 
 	const PER_PAGE = 10;
 
@@ -138,7 +139,7 @@
 				When you upload a file, the link is saved automatically to this browser.
 			</p>
 			<a
-				href="/"
+				href={resolve('/')}
 				class="inline-block px-4 py-2 text-xs font-medium text-white bg-violet-500 hover:bg-violet-600 rounded-lg transition-colors"
 			>
 				Upload a file
