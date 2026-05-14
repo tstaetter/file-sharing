@@ -80,12 +80,6 @@
 
 			<nav class="flex items-center gap-1">
 				<a
-					href="/"
-					class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-				>
-					Home
-				</a>
-				<a
 					href="/zero-knowledge"
 					class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
 				>
