@@ -93,6 +93,9 @@ pub enum SavedUrlError {
 
     #[error("per_page must be between 1 and 100")]
     InvalidPerPage,
+
+    #[error("saved URL not found")]
+    NotFound,
 }
 
 impl IntoResponse for CheckFileError {
@@ -109,6 +112,7 @@ impl IntoResponse for SavedUrlError {
             Self::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::InvalidPage => StatusCode::BAD_REQUEST,
             Self::InvalidPerPage => StatusCode::BAD_REQUEST,
+            Self::NotFound => StatusCode::NOT_FOUND,
         };
         (status, self.to_string()).into_response()
     }

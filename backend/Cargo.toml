@@ -8,7 +8,7 @@ readme = "README.md"
 [dependencies]
 atty = "0.2"
 anyhow = "1"
-bson = { version = "3", features = ["chrono-0_4", "serde", "serde_with-3"] }
+bson = { version = "3", features = ["chrono-0_4", "serde", "serde_with-3", "uuid-1"] }
 mongodb = { version = "3", features = ["bson-3"] }
 dotenvy = "0.15"
 axum = "0.8"

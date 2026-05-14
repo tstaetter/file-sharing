@@ -2,7 +2,8 @@ use crate::db::saved_url::SavedUrl;
 use crate::handlers::errors::SavedUrlError;
 use crate::middleware::AuthUser;
 use crate::AppState;
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
 use axum::Json;
 use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
@@ -152,6 +153,41 @@ pub async fn list_urls(
         per_page: query.per_page,
         total,
     }))
+}
+
+/// Delete a saved URL by its ID.
+///
+/// Requires a valid Authorization: Bearer token header. Only the owner
+/// of the URL can delete it (enforced by matching user_email with the
+/// authenticated users email). Returns 204 No Content on success,
+/// 404 Not Found if the URL doesnt exist or belongs to another user.
+pub async fn delete_url(
+    auth_user: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, SavedUrlError> {
+    let db = state
+        .database
+        .as_ref()
+        .ok_or_else(|| SavedUrlError::Database("no database configured".into()))?;
+    let collection = db.collection::<SavedUrl>("saved_urls");
+    let object_id = mongodb::bson::Uuid::parse_str(&id).map_err(|_| SavedUrlError::NotFound)?;
+    // Delete only if the URL belongs to the authenticated user
+    let filter = doc! {
+        "_id": &object_id,
+        "user_email": &auth_user.claims.sub,
+    };
+
+    let result = collection
+        .delete_one(filter)
+        .await
+        .map_err(|e| SavedUrlError::Database(e.to_string()))?;
+
+    if result.deleted_count == 0 {
+        return Err(SavedUrlError::NotFound);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -366,18 +402,6 @@ mod tests {
         assert_eq!(query.per_page, 10);
     }
 
-    #[test]
-    fn test_pagination_skip_calculation() {
-        // Page 1, per_page 10 → skip = 0
-        assert_eq!((1 - 1) * 10, 0);
-        // Page 3, per_page 10 → skip = 20
-        assert_eq!((3 - 1) * 10, 20);
-        // Page 1, per_page 25 → skip = 0
-        assert_eq!((1 - 1) * 25, 0);
-        // Page 5, per_page 50 → skip = 200
-        assert_eq!((5 - 1) * 50, 200);
-    }
-
     // ── Unit tests: Token integration ─────────────────────────────────
 
     // ── Unit tests: Response ID is a valid UUID string ────────────────
@@ -400,7 +424,7 @@ mod tests {
     fn test_save_url_response_from_saved_url() {
         use chrono::TimeZone;
         let saved = SavedUrl {
-            id: uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            id: mongodb::bson::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             user_email: "user@test.com".to_string(),
             url: "https://filez.zone/f/abc#key".to_string(),
             title: Some("My file".to_string()),
@@ -417,7 +441,7 @@ mod tests {
     #[test]
     fn test_save_url_response_excludes_user_email() {
         let saved = SavedUrl {
-            id: uuid::Uuid::new_v4(),
+            id: mongodb::bson::Uuid::new(),
             user_email: "secret@test.com".to_string(),
             url: "url".to_string(),
             title: None,

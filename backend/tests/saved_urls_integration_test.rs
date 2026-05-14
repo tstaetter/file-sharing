@@ -1281,3 +1281,155 @@ async fn full_crud_lifecycle() {
         assert_iso8601(url["created_at"].as_str().unwrap());
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Delete URL tests
+// ═══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn delete_url_returns_204() {
+    ensure_jwt_secret();
+    let state = test_state_with_db("surl_del_204").await;
+    let router = app(state);
+    let token = register_and_get_token(router.clone(), "del@test.com", "secret123", "Delete").await;
+    // Save a URL first
+    let saved = save_url(
+        router.clone(),
+        &token,
+        "https://example.com/f/uuid#key",
+        Some("To delete"),
+    )
+    .await;
+    let id = saved["id"].as_str().unwrap();
+    // Delete it
+    let response = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/v1/urls/{}", id))
+                .header(header::AUTHORIZATION, format!("Bearer {}", token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    // Verify it's gone from list
+    let list = list_urls(router, &token, None, None).await;
+    assert_eq!(list["total"], 0);
+}
+
+#[tokio::test]
+async fn delete_url_returns_404_for_nonexistent() {
+    ensure_jwt_secret();
+    let state = test_state_with_db("surl_del_404").await;
+    let router = app(state);
+    let token = register_and_get_token(router.clone(), "del404@test.com", "secret123", "D").await;
+    let fake_id = "00000000-0000-0000-0000-000000000000";
+    let response = router
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/v1/urls/{}", fake_id))
+                .header(header::AUTHORIZATION, format!("Bearer {}", token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn delete_url_returns_404_for_other_users_url() {
+    ensure_jwt_secret();
+    let state = test_state_with_db("surl_del_other").await;
+    let router = app(state);
+    // Alice saves a URL
+    let alice_token =
+        register_and_get_token(router.clone(), "alice_del@test.com", "secret123", "Alice").await;
+    let saved = save_url(
+        router.clone(),
+        &alice_token,
+        "https://example.com/f/a#k",
+        Some("Alice file"),
+    )
+    .await;
+    let id = saved["id"].as_str().unwrap();
+    // Bob tries to delete Alice's URL
+    let bob_token =
+        register_and_get_token(router.clone(), "bob_del@test.com", "secret123", "Bob").await;
+    let response = router
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/v1/urls/{}", id))
+                .header(header::AUTHORIZATION, format!("Bearer {}", bob_token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn delete_url_rejects_missing_auth() {
+    ensure_jwt_secret();
+    let state = test_state_with_db("surl_del_noauth").await;
+    let router = app(state);
+    let response = router
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/urls/00000000-0000-0000-0000-000000000000")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn delete_url_rejects_invalid_token() {
+    ensure_jwt_secret();
+    let state = test_state_with_db("surl_del_badtok").await;
+    let router = app(state);
+    let response = router
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/urls/00000000-0000-0000-0000-000000000000")
+                .header(header::AUTHORIZATION, "Bearer invalidtoken")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn delete_url_returns_500_without_database() {
+    ensure_jwt_secret();
+    let router = app(test_state());
+
+    // Create a syntactically valid JWT signed with the test secret.
+    let token = backend::create_token("nod-delete@example.com")
+        .expect("create_token must succeed with JWT_SECRET set");
+
+    let response = router
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/urls/00000000-0000-0000-0000-000000000000")
+                .header(header::AUTHORIZATION, format!("Bearer {}", token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+}
