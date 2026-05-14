@@ -4,6 +4,8 @@ Browser-based UI for the file-sharing service. Built with **SvelteKit** and **Sv
 
 Authenticated users can save capability URLs to their collection — links are **auto-saved after upload** and browsable in a paginated list view.
 
+Saved URLs are stored in the browser's **localStorage** (no server round-trip).
+
 ## Quick Start
 
 ### Prerequisites
@@ -32,7 +34,7 @@ SvelteKit requires browser-accessible environment variables to be prefixed with 
 import { PUBLIC_API_PREFIX } from '$env/static/public';
 ```
 
-- `PUBLIC_API_PREFIX` — the backend API base URL (used by `upload.ts`, `savedUrls.ts`, and `f/[id]/+page.svelte`)
+- `PUBLIC_API_PREFIX` — the backend API base URL (used by `upload.ts`, `savedUrls.svelte.ts`, and `f/[id]/+page.svelte`)
 - `PUBLIC_PREFIX` — the frontend base URL for building capability URLs
 
 Make sure the backend is running, or update `PUBLIC_API_PREFIX` if the backend is deployed elsewhere.
@@ -88,11 +90,11 @@ Test files live next to the modules they exercise (e.g., `src/lib/savedUrls.test
    - Collects ETags and finalises with `POST /v1/complete-upload`.
 3. Returns the raw AES key bytes and file ID.
 4. `createCapabilityUrl()` builds the shareable URL: `{PUBLIC_PREFIX}/f/{fileId}#{url-safe-base64(key)}`.
-5. **Auto-save (authenticated users only):** After a successful upload, if the user is logged in:
-   - Calls `saveUrl(link, file.name, auth.token)` from `src/lib/savedUrls.ts`.
+5. **Auto-save:** After a successful upload:
+   - Calls `localUrls.add(link, file.name)` from `src/lib/savedUrls.svelte.ts`.
    - Uses the original filename as the URL title.
-   - Silently handles failures — the upload still succeeded, saving is a bonus.
-   - Shows inline feedback: "Saving link to your collection…" while in progress, then a "Saved to your collection" link to `/urls` on success.
+   - Stores directly in localStorage — instant, no network round-trip.
+   - Shows inline feedback: "Saved to your collection" with a link to `/urls`.
 
 ### Download (`/f/[id]`)
 
@@ -103,17 +105,18 @@ Test files live next to the modules they exercise (e.g., `src/lib/savedUrls.test
 
 ### Saved URLs (`/urls`)
 
-1. Authenticated users navigate to `/urls` (via the nav bar, user dropdown, or auto-save confirmation link).
-2. The page checks `auth.isAuthenticated` on mount — redirects to `/login` if not authenticated.
-3. Calls `listUrls(auth.token, page, perPage)` from `src/lib/savedUrls.ts` with the JWT in an `Authorization: Bearer <token>` header.
-4. Displays saved URLs in a paginated list with:
+1. Users navigate to `/urls` (via the nav bar or auto-save confirmation link). No authentication required.
+2. The page reads from `localUrls.urls` — a reactive `$state` array backed by localStorage.
+3. For each saved URL, calls `checkFile(fileId)` to check if the file still exists in R2.
+4. Displays saved URLs in a paginated client-side list with:
    - **Title** (or truncated URL if no title was set).
    - **Full URL** underneath when a title is present.
    - **Formatted save date**.
    - **Copy button** — copies the capability URL to clipboard with checkmark feedback.
    - **Open button** — opens the link in a new tab.
-5. Supports pagination with Previous/Next buttons and page counter.
-6. Handles loading (spinner), empty (helpful message + upload CTA), and error (message with retry) states.
+   - **Delete button** — removes the URL from localStorage with confirmation.
+5. Client-side pagination with Previous/Next buttons and page counter.
+6. Handles empty state (helpful message + upload CTA).
 
 ### Zero-Knowledge Architecture
 
@@ -152,7 +155,7 @@ src/
 ├── app.html                 ← HTML shell
 ├── lib/
 │   ├── auth.svelte.ts       ← Svelte 5 runes auth store (JWT, localStorage persistence, reactive state)
-│   ├── savedUrls.ts         ← API module for saved capability URLs (Bearer auth, paginated list)
+│   ├── savedUrls.svelte.ts  ← localStorage-based saved URLs store (reactive runes, CRUD, check-file)
 │   ├── index.ts             ← barrel export for $lib
 │   ├── upload.ts            ← multipart upload orchestrator wrapper (binds PUBLIC_API_PREFIX to SDK)
 │   └── assets/
@@ -164,7 +167,7 @@ src/
     │   └── [id]/
     │       └── +page.svelte ← download page (fetch, decrypt, save)
     ├── urls/
-    │   └── +page.svelte     ← saved URLs list page (paginated, copy, open — auth required)
+    │   └── +page.svelte     ← saved URLs list page (client-side pagination, copy, open, delete — no auth)
     ├── health/
     │   └── +server.ts       ← health check endpoint (GET /health → {"status":"ok"})
     ├── login/
@@ -189,9 +192,9 @@ The SDK logic (encryption, chunking, capability URL building) lives in `packages
 
 | Route | Description |
 |---|---|
-| `/` | Upload page — pick a file, encrypt, and upload with progress bar and auto-save for authenticated users |
+| `/` | Upload page — pick a file, encrypt, and upload with progress bar and auto-save to localStorage |
 | `/f/[id]` | Download page — decrypt and save file after burn-after-read fetch |
-| `/urls` | Saved URLs — paginated list of saved capability URLs (auth required) |
+| `/urls` | Saved URLs — paginated list of saved capability URLs (no auth required, stored in localStorage) |
 | `/health` | Koyeb health check — returns `{"status":"ok"}` with HTTP 200 |
 | `/zero-knowledge` | Educational page explaining zero-knowledge encryption architecture |
 | `/privacy` | Privacy policy — data collection, encryption, third-party services |
@@ -224,10 +227,12 @@ The frontend reads the backend base URL from `PUBLIC_API_PREFIX` in `$env/static
 
 ### Protected endpoints (Bearer auth required)
 
+These endpoints exist on the backend but are **not used by the default frontend** — saved URLs are stored in localStorage.
+
 | Method | Endpoint            | Used in                  | Purpose                             | Auth Header                        |
 |--------|---------------------|--------------------------|-------------------------------------|------------------------------------|
-| POST   | `/v1/urls`             | `savedUrls.ts`           | Save a capability URL               | `Authorization: Bearer <token>`    |
-| GET    | `/v1/urls`             | `savedUrls.ts`           | List saved URLs (paginated)         | `Authorization: Bearer <token>`    |
+| POST   | `/v1/urls`             | (not used by frontend)   | Save a capability URL               | `Authorization: Bearer <token>`    |
+| GET    | `/v1/urls`             | (not used by frontend)   | List saved URLs (paginated)         | `Authorization: Bearer <token>`    |
 
 ## Analytics
 

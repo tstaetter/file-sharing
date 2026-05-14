@@ -7,7 +7,7 @@ This is the frontend for a file-sharing service, built with **SvelteKit**. It pr
 1. **Upload files** with client-side AES-256-GCM encryption and multipart, resumable uploads directly to Cloudflare R2 via presigned URLs.
 2. **Download files** exactly once — the backend deletes the object from storage after serving it ("burn after reading").
 3. **Share files** via capability URLs that embed the decryption key in the URL hash fragment. The key never touches the server.
-4. **Save and manage capability URLs** for authenticated users — links are auto-saved after upload and browsable in a paginated list view.
+4. **Save and manage capability URLs** — links are auto-saved after upload and stored in the browser's localStorage. No authentication required for the saved URL list.
 5. **Authenticate** with JWT-based login/register, with the token persisted in localStorage and sent via `Authorization: Bearer` header for protected endpoints.
 
 All encryption and decryption happens in the browser using the Web Crypto API. The frontend communicates with a Rust/Axum backend (documented separately in `backend/AGENTS.md`).
@@ -52,7 +52,7 @@ frontend/
     ├── lib/
     │   ├── index.ts             ← barrel export for $lib
     │   ├── auth.svelte.ts       ← Svelte 5 runes auth store (JWT, localStorage, reactive state)
-    │   ├── savedUrls.ts         ← API module for saved capability URLs (Bearer auth)
+    │   ├── savedUrls.svelte.ts  ← localStorage-based saved URLs store (reactive runes, no auth)
     │   ├── upload.ts            ← multipart upload orchestrator wrapper
     │   └── assets/
     │       └── logo.webp
@@ -63,7 +63,7 @@ frontend/
         │   └── [id]/
         │       └── +page.svelte ← download page (fetch, decrypt, save)
         ├── urls/
-        │   └── +page.svelte     ← saved URLs list page (paginated, copy, open)
+        │   └── +page.svelte     ← saved URLs list page (paginated, copy, open, delete — no auth required)
         ├── health/
         │   └── +server.ts       ← health check endpoint
         ├── login/
@@ -201,11 +201,11 @@ Then define the following tasks in `deno.json`:
    - Collects ETags and finalises with `POST /v1/complete-upload`.
 3. Returns the raw AES key bytes and file ID.
 4. `createCapabilityUrl()` builds the shareable URL: `{PUBLIC_PREFIX}/f/{fileId}#{url-safe-base64(key)}`.
-5. **Auto-save (authenticated users only):** After a successful upload, if `auth.isAuthenticated` is true:
-   - Calls `saveUrl(link, file.name, auth.token)` from `src/lib/savedUrls.ts`.
+5. **Auto-save:** After a successful upload:
+   - Calls `localUrls.add(link, file.name)` from `src/lib/savedUrls.svelte.ts`.
    - Uses the original filename as the URL title.
-   - Silently handles failures — the upload still succeeded, saving is a bonus.
-   - Shows inline feedback: "Saving link to your collection…" while in progress, then a "Saved to your collection" link to `/urls` on success.
+   - Stores directly in localStorage — instant, no network round-trip.
+   - Shows inline feedback: "Saved to your collection" with a link to `/urls`.
 
 ### Download (`/f/[id]` route)
 
@@ -221,19 +221,19 @@ Then define the following tasks in `deno.json`:
 
 ### Saved URLs (`/urls` route)
 
-1. Authenticated users navigate to `/urls` (via nav link or auto-save confirmation).
-2. The page checks `auth.isAuthenticated` on mount — redirects to `/login` if not authenticated.
-3. Calls `listUrls(auth.token, page, perPage)` from `src/lib/savedUrls.ts`.
-4. For each saved URL, calls `checkFile(fileId)` from `src/lib/savedUrls.ts` to check if the underlying file still exists in storage (via `PUT /v1/check-file`).
-5. Displays saved URLs in a paginated list with:
+1. Users navigate to `/urls` (via nav link or auto-save confirmation). No authentication required.
+2. The page reads from `localUrls.urls` — a reactive `$state` array from `src/lib/savedUrls.svelte.ts`.
+3. For each saved URL, calls `checkFile(fileId)` from `src/lib/savedUrls.svelte.ts` to check if the underlying file still exists in storage (via `PUT /v1/check-file`).
+4. Displays saved URLs in a paginated list with:
    - **Title** (or truncated URL if no title was set).
    - **Full URL** underneath when a title is present.
    - **Formatted save date**.
    - **"Already used" badge** — shown when the file has been consumed (check-file returns 404).
    - **Copy button** — copies the capability URL to clipboard with checkmark feedback.
    - **Open button** — opens the link in a new tab.
-6. Supports pagination with Previous/Next buttons and page counter.
-7. Handles loading, empty, and error states.
+   - **Delete button** — removes the URL from localStorage with confirmation.
+5. Client-side pagination with Previous/Next buttons and page counter.
+6. Handles empty state (helpful message + upload CTA).
 
 ### Encryption Model
 
@@ -266,10 +266,12 @@ The frontend reads the backend base URL from `PUBLIC_API_PREFIX` in `$env/static
 
 ### Protected endpoints (Bearer auth required)
 
+These endpoints exist on the backend but are **not used by the default frontend** — the frontend stores saved URLs in localStorage instead.
+
 | Method | Endpoint            | Used in                  | Purpose                             | Auth Header                        |
 |--------|---------------------|--------------------------|-------------------------------------|------------------------------------|
-| POST   | `/v1/urls`             | `savedUrls.ts`           | Save a capability URL               | `Authorization: Bearer <token>`    |
-| GET    | `/v1/urls`             | `savedUrls.ts`           | List saved URLs (paginated)         | `Authorization: Bearer <token>`    |
+| POST   | `/v1/urls`             | (not used by frontend)   | Save a capability URL               | `Authorization: Bearer <token>`    |
+| GET    | `/v1/urls`             | (not used by frontend)   | List saved URLs (paginated)         | `Authorization: Bearer <token>`    |
 | DELETE | `/v1/delete`           | `auth.svelte.ts`         | Delete user account                 | `Authorization: Bearer <token>`    |
 
 Refer to `backend/AGENTS.md` for the request/response schemas.
@@ -280,10 +282,11 @@ Refer to `backend/AGENTS.md` for the request/response schemas.
 - **ESLint** with the `eslint-plugin-svelte` and `typescript-eslint` plugins handles linting. Run `deno task lint` and fix all issues.
 - **TypeScript strict mode** is enabled (`"strict": true` in `tsconfig.json`). Do not weaken type safety without a documented reason.
 - Use **Svelte 5 runes** (`$state`, `$derived`, `$props`, `$effect`) for all new code. The `svelte.config.js` forces runes mode project-wide.
-- **$lib alias:** Import shared modules via `$lib/` (e.g., `import { saveUrl } from '$lib/savedUrls'`). Do not use relative paths to reach into `src/lib/`.
-- **File naming:** Use `kebab-case` for route directories and `.ts` / `.svelte` extensions for modules and components. Test files use `.test.ts`.
+- **$lib alias:** Import shared modules via `$lib/` (e.g., `import { localUrls } from '$lib/savedUrls.svelte'`). Do not use relative paths to reach into `src/lib/`.
+- **File naming:** Use `kebab-case` for route directories and `.ts` / `.svelte` / `.svelte.ts` extensions for modules and components. Use `.svelte.ts` for files that use Svelte 5 runes (`$state`, `$derived`, etc.). Test files use `.test.ts`.
 - **Environment-specific URLs:** The backend base URL is configured via the `PUBLIC_API_PREFIX` environment variable in `frontend/.env`, accessible in browser-side code through `$env/static/public`.
 - **Bearer token auth:** All protected API calls pass the JWT via `Authorization: Bearer <token>` header. The token is stored in `auth.token` from the reactive auth store.
+- **LocalStorage state:** For browser-side persistent state that doesn't need server sync, use a `.svelte.ts` store with reactive runes (see `savedUrls.svelte.ts`).
 
 ## Common Tasks for Agents
 
@@ -294,11 +297,15 @@ Refer to `backend/AGENTS.md` for the request/response schemas.
    ```typescript
    export { myFunction } from './myModule';
    ```
-3. For API modules, follow the pattern in `savedUrls.ts`:
+3. For API modules, follow the pattern in `upload.ts`:
    - Import `PUBLIC_API_PREFIX` from `$env/static/public`.
    - For protected endpoints, accept a `token: string` parameter and set the `Authorization: Bearer ${token}` header.
    - Define TypeScript interfaces for request/response types.
    - Throw descriptive errors on non-ok responses.
+4. For localStorage-based state, follow the pattern in `savedUrls.svelte.ts`:
+   - Use `.svelte.ts` extension to enable Svelte 5 runes.
+   - Create a factory function returning a singleton with reactive `$state`.
+   - Provide `persistToStorage`/`loadFromStorage` helpers for the localStorage key.
 
 ### Adding a new route
 
@@ -332,7 +339,7 @@ Refer to `backend/AGENTS.md` for the request/response schemas.
 ### Updating the backend URL
 
 1. Update the `PUBLIC_API_PREFIX` value in `frontend/.env`.
-2. The value is imported by `upload.ts`, `savedUrls.ts`, and `f/[id]/+page.svelte` from `$env/static/public`, so no code changes are needed for these modules.
+2. The value is imported by `upload.ts`, `savedUrls.svelte.ts`, and `f/[id]/+page.svelte` from `$env/static/public`, so no code changes are needed for these modules.
 3. For deployments, set `PUBLIC_API_PREFIX` in the production environment or as a build arg.
 
 ### Adding a UI dependency
@@ -363,16 +370,22 @@ auth.deleteAccount()                // delete account and sign out
 auth.clearError()                   // clear error state
 ```
 
-### Working with the saved URLs API
+### Working with the saved URLs store
 
 ```typescript
-import { saveUrl, listUrls, type SavedUrlItem } from '$lib/savedUrls';
-import { auth } from '$lib/auth.svelte';
+import { localUrls, checkFile, extractFileId, type LocalUrlItem } from '$lib/savedUrls.svelte';
 
-// Save a URL (requires valid token)
-const result = await saveUrl('https://filez.zone/f/abc#key', 'My file', auth.token!);
-// result = { id: "uuid", url: "...", title: "My file", created_at: "2025-..." }
+// Reactive state (use in Svelte components)
+localUrls.urls           // LocalUrlItem[] — reactive array, newest first
 
-// List saved URLs with pagination
-const list = await listUrls(auth.token!, 1, 10);
-// list = { urls: [...], page: 1, per_page: 10, total: 42 }
+// Actions
+localUrls.add(url, title)   // save a URL (returns the new LocalUrlItem)
+localUrls.remove(id)        // delete a URL by its ID
+localUrls.reload()          // re-read from localStorage (cross-tab sync)
+
+// File existence check (calls backend API — no auth required)
+const exists = await checkFile(fileId);  // true or false
+
+// Extract file ID from a capability URL
+const fileId = extractFileId('https://filez.zone/f/abc-123#key');  // 'abc-123'
+```

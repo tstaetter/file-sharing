@@ -1,6 +1,6 @@
 use crate::handlers::{
-    abort_upload, check_file, complete_upload, create_upload, delete_url, delete_user, download,
-    health, list_urls, login, register, save_url, sign_parts,
+    abort_upload, check_file, complete_upload, create_upload, delete_user, download, health, login,
+    register, sign_parts,
 };
 use crate::middleware::require_auth;
 use crate::AppState;
@@ -15,8 +15,6 @@ pub fn app(state: AppState) -> Router {
         .route("/login", post(login))
         .with_state(state.clone());
     let protected_routes = Router::new()
-        .route("/urls", post(save_url).get(list_urls))
-        .route("/urls/{id}", delete(delete_url))
         .route("/delete", delete(delete_user))
         .layer(middleware::from_fn(require_auth));
     let routes = Router::new()

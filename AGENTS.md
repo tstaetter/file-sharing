@@ -6,18 +6,20 @@ This is a **file-sharing monorepo** that enables secure, end-to-end encrypted fi
 
 Authenticated users can save capability URLs to their collection — links are auto-saved after upload and browsable in a paginated list view.
 
+Saved capability URLs are stored in the browser's **localStorage** (no server round-trip). The backend still provides API endpoints for saving/listing/deleting URLs for deployments that need server-side storage, but the frontend uses localStorage exclusively.
+
 The repo contains three sub-projects:
 
 | Sub-project | Path          | Language      | Description                                      |
 |-------------|---------------|---------------|--------------------------------------------------|
-| Backend API | `backend/`    | Rust (Axum)   | Presigned URL generation, multipart upload, burn-after-read download, user auth (JWT + bcrypt + MongoDB), saved URLs with Bearer token middleware |
-| Frontend    | `frontend/`   | TypeScript (SvelteKit) | Upload UI, client-side encryption/decryption, capability URLs, login/register with JWT auth, auto-save and list view for saved URLs |
+| Backend API | `backend/`    | Rust (Axum)   | Presigned URL generation, multipart upload, burn-after-read download, user auth (JWT + bcrypt + MongoDB), saved URLs API (Bearer token middleware) |
+| Frontend    | `frontend/`   | TypeScript (SvelteKit) | Upload UI, client-side encryption/decryption, capability URLs, login/register with JWT auth, localStorage-based saved URLs with auto-save and list view |
 | Workers    | `worker/`     | Rust (standalone) | Background maintenance jobs (e.g. orphaned upload cleanup) |
 
 Each sub-project has its own `AGENTS.md` with detailed setup, testing, and contribution guidance:
 
-- `backend/AGENTS.md` — Rust toolchain, `cargo nextest` for testing, auth middleware pattern, saved URLs endpoints
-- `frontend/AGENTS.md` — Deno package manager, Vitest for testing, auth store pattern, saved URLs API module
+- `backend/AGENTS.md` — Rust toolchain, `cargo nextest` for testing, auth middleware pattern, saved URLs API endpoints
+- `frontend/AGENTS.md` — Deno package manager, Vitest for testing, auth store pattern, localStorage saved URLs store
 - `worker/AGENTS.md` — Rust standalone workers, S3/R2 client, periodic cleanup jobs
 
 ## Architecture
@@ -32,7 +34,8 @@ Each sub-project has its own `AGENTS.md` with detailed setup, testing, and contr
 │  client-side │          │  URLs only   │          │  blobs       │
 │              │          │              │          │              │
 │  auth store  │          │  Bearer auth │          │              │
-│  (localStor) │          │  middleware  │          │              │
+│  saved URLs  │          │  middleware  │          │              │
+│  (localStor) │          │              │          │              │
 └──────────────┘          └──────┬───────┘          └──────────────┘
                                  │
                                  │ MongoDB
@@ -51,7 +54,7 @@ Key architectural principles:
 3. **Files are self-destructing.** The download endpoint fetches the object from R2, returns it, then immediately deletes it. A file can only be downloaded once.
 4. **Uploads are direct-to-R2.** The backend generates presigned URLs; the frontend PUTs encrypted chunks directly to cloud storage. File data never passes through the backend.
 5. **Protected routes use Bearer token middleware.** Authenticated endpoints (saved URLs) validate JWT tokens via `Authorization: Bearer <token>` header in middleware, rejecting unauthenticated requests with `401` before handlers run.
-6. **Auto-save for authenticated users.** Capability URLs are automatically saved to the user's collection after a successful upload when the user is logged in. Saving is silently best-effort — upload success is independent of save success.
+6. **Auto-save for all users.** Capability URLs are automatically saved to localStorage after a successful upload. No authentication is required — the saved URL list is per-browser.
 
 ## Upload Flow
 
@@ -80,10 +83,8 @@ Browser                              Backend                         R2
   │  7. Build capability URL:         │                              │
   │     /f/{uuid}#{url-safe-base64(key)}                              │
   │                                    │                              │
-  │  8. If authenticated:             │                              │
-  │     POST /v1/urls ───────────────────►│                              │
-  │     Authorization: Bearer <token> │   save to MongoDB             │
-  │     { url, title }                │                              │
+  │  8. Save to localStorage           │                              │
+  │     (title = original filename)    │                              │
 ```
 
 ## Download Flow
@@ -114,24 +115,18 @@ Browser                              Backend                         R2
 Browser                              Backend                         R2
   │                                    │                              │
   │  1. User visits /urls             │                              │
-  │     Auth guard: redirect if       │                              │
-  │     not authenticated             │                              │
+  │     Reads from localStorage        │                              │
+  │     (no auth required)             │                              │
   │                                    │                              │
-  │  2. GET /v1/urls?page=1&per_page=10►│                              │
-  │     Authorization: Bearer <token> │   require_auth middleware     │
-  │                                    │   validates JWT              │
-  │                                    │   queries MongoDB            │
-  │◄──── { urls, page, per_page, total }                              │
-  │                                    │                              │
-  │  3. For each saved URL:           │                              │
+  │  2. For each saved URL:           │                              │
   │     PUT /v1/check-file            │                              │
   │     { key: fileId } ─────────────►│   head_object ──────────────►│
   │                                    │◄─────── 200 or 404 ─────────│
   │◄──── 200 (exists) or 404 (gone)   │                              │
   │                                    │                              │
-  │  4. Render paginated list with    │                              │
-  │     copy & open actions, and      │                              │
-  │     "Already used" badges for     │                              │
+  │  3. Render paginated list with    │                              │
+  │     copy, open & delete actions,  │                              │
+  │     and "Already used" badges for │                              │
   │     consumed files                │                              │
 ```
 
@@ -142,7 +137,7 @@ Browser                              Backend                         R2
 - **Backend:** Rust toolchain (stable), `cargo-nextest`
 - **Frontend:** Deno 2.x+
 - **Storage:** A Cloudflare R2 bucket with API credentials
-- **Database:** MongoDB (optional — required for user accounts and saved URLs)
+- **Database:** MongoDB (optional — required for user accounts; saved URLs use browser localStorage)
 
 ### Environment Variables
 
@@ -202,7 +197,7 @@ cargo run
 
 The frontend reads the backend base URL from the `PUBLIC_API_PREFIX` environment variable (`$env/static/public`), used in:
 - `frontend/src/lib/upload.ts` (delegates to SDK for create-upload, sign-parts, complete-upload)
-- `frontend/src/lib/savedUrls.ts` (save-url and list-urls with Bearer auth)
+- `frontend/src/lib/savedUrls.svelte.ts` (localStorage-based saved URL store with reactive runes)
 - `frontend/src/routes/f/[id]/+page.svelte` (download fetch)
 
 Set `PUBLIC_API_PREFIX` in `frontend/.env` (or your deployment environment) to point at the backend.
@@ -221,15 +216,15 @@ Set `PUBLIC_API_PREFIX` in `frontend/.env` (or your deployment environment) to p
 | POST   | `/v1/auth/register`   | None                          | Register new user                       |
 | POST   | `/v1/auth/login`      | None                          | Authenticate, get JWT                   |
 | DELETE | `/v1/delete`           | `Authorization: Bearer <token>` | Delete user account (204 No Content)   |
-| POST   | `/v1/urls`            | `Authorization: Bearer <token>` | Save a capability URL                   |
-| GET    | `/v1/urls`            | `Authorization: Bearer <token>` | List saved URLs (paginated)             |
+| POST   | `/v1/urls`            | `Authorization: Bearer <token>` | Save a capability URL (not used by frontend — see localStorage) |
+| GET    | `/v1/urls`            | `Authorization: Bearer <token>` | List saved URLs, paginated (not used by frontend — see localStorage) |
 
 ## Sub-Project AGENTS.md References
 
 For language-specific setup, testing commands, code conventions, and contribution patterns, see:
 
 - **[backend/AGENTS.md](backend/AGENTS.md)** — Rust edition 2021, Axum 0.8, `cargo nextest`, tracing, S3/R2 client, auth middleware pattern, `AuthUser` extractor, Bearer token convention, saved URLs handlers, error handling conventions
-- **[frontend/AGENTS.md](frontend/AGENTS.md)** — Deno, SvelteKit 2, Svelte 5 runes, Vitest, TailwindCSS, ESLint + Prettier, `$lib` module conventions, auth store pattern, saved URLs API module, Bearer token auth in API calls
+- **[frontend/AGENTS.md](frontend/AGENTS.md)** — Deno, SvelteKit 2, Svelte 5 runes, Vitest, TailwindCSS, ESLint + Prettier, `$lib` module conventions, auth store pattern, saved URLs store with localStorage and reactive runes
 - **[worker/AGENTS.md](worker/AGENTS.md)** — Rust standalone workers, S3/R2 client, cleanup jobs, Docker deployment
 
 ## Common Cross-Cutting Tasks
@@ -292,7 +287,7 @@ The project uses two authentication patterns depending on the route group:
 | Route group | Paths | Auth pattern | Rationale |
 |---|---|---|---|
 | `auth_routes` | `/v1/auth/*` | Token in request body | Login and register don't have a token yet |
-| `protected_routes` | `/v1/urls` | `Authorization: Bearer <token>` header, validated by middleware | Standard REST API pattern; middleware rejects unauthenticated requests before handlers run |
+| `protected_routes` | `/v1/urls`, `/v1/delete` | `Authorization: Bearer <token>` header, validated by middleware | Standard REST API pattern; middleware rejects unauthenticated requests before handlers run. Note: the frontend uses localStorage for saved URLs; the `/v1/urls` endpoints are available for server-side storage but not called by the default UI. |
 | Unprotected | Everything else | None | Anonymous file sharing works without auth |
 
 **How the Bearer auth middleware works:**
@@ -308,7 +303,7 @@ The project uses two authentication patterns depending on the route group:
 1. The auth store (`src/lib/auth.svelte.ts`) uses Svelte 5 runes for reactive state.
 2. JWTs are persisted in `localStorage` with automatic expiry detection.
 3. Login/register return `{ token, user }` — the token is stored and the user info is made reactive.
-4. Protected API calls (`savedUrls.ts`) pass the token in the `Authorization: Bearer <token>` header.
+4. Protected API calls (`savedUrls.svelte.ts`) are replaced by direct localStorage operations — no server round-trip needed.
 5. The `isAuthenticated` derived state enables conditional UI (nav links, auto-save, auth guards).
 
 ### Adding a feature that touches both frontend and backend
@@ -318,7 +313,8 @@ The project uses two authentication patterns depending on the route group:
    - If it needs auth, add `auth_user: AuthUser` as the first extractor and register in `protected_routes`.
    - If it doesn't need auth, register in the main `routes` router.
 3. Implement the frontend integration following the pattern in `frontend/AGENTS.md`:
-   - Create an API module in `src/lib/` following the `savedUrls.ts` pattern.
+   - For localStorage-based state, create a `.svelte.ts` module following the `savedUrls.svelte.ts` pattern.
+   - For API calls, create a standard `.ts` module and call `fetch` against `PUBLIC_API_PREFIX`.
    - For protected endpoints, accept a `token: string` parameter and set `Authorization: Bearer ${token}` header.
    - Wire into a page component with loading/error/empty states.
 4. Update both AGENTS.md files and this root AGENTS.md if the change introduces a new convention or dependency.

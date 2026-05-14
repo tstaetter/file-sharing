@@ -7,7 +7,7 @@ This is the backend API for a file-sharing service. It provides endpoints that e
 1. **Upload files** via a multipart, resumable upload mechanism using presigned URLs.
 2. **Download files** exactly once — after a successful download the stored object is deleted from cloud storage ("burn after reading").
 3. **Authenticate users** with bcrypt password hashing and JWT tokens.
-4. **Save and list capability URLs** for authenticated users so they can revisit shared links.
+4. **Save and list capability URLs** for authenticated users. The backend provides these API endpoints, though the default frontend stores saved URLs in the browser's localStorage instead.
 
 Files are stored in Cloudflare R2, an S3-compatible object store. The backend generates presigned URLs for individual upload parts so the frontend can upload chunks directly to R2 without the file data passing through the backend server.
 
@@ -219,6 +219,8 @@ Authenticated users can save capability URLs to their collection. The `save_url`
 - Store URLs in the `saved_urls` MongoDB collection with fields: `id` (UUID), `user_email`, `url`, `title`, `created_at`.
 - Support pagination (`page` and `per_page` query parameters, defaults 1 and 10, max 100).
 - Return results in reverse chronological order (newest first).
+
+Note: the default frontend stores saved URLs in the browser's localStorage and does not call these endpoints. They are available for deployments that prefer server-side storage.
 
 ## Code Style & Conventions
 

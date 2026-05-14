@@ -1,42 +1,28 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { auth } from '$lib/auth.svelte';
-	import { checkFile, deleteUrl, extractFileId, listUrls, type SavedUrlItem } from '$lib/savedUrls';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
+	import { localUrls, checkFile, extractFileId, type LocalUrlItem } from '$lib/savedUrls.svelte';
 
-	let urls = $state<SavedUrlItem[]>([]);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+	const PER_PAGE = 10;
+
 	let page = $state(1);
-	let total = $state(0);
-	let perPage = $state(10);
 	let copiedId = $state<string | null>(null);
 	let consumedIds = new SvelteSet<string>();
-	let deletingIds = new SvelteSet<string>();
+	let checking = $state(false);
 
-	const totalPages = $derived(Math.max(1, Math.ceil(total / perPage)));
+	const paginatedUrls = $derived.by(() => {
+		const start = (page - 1) * PER_PAGE;
+		return localUrls.urls.slice(start, start + PER_PAGE);
+	});
 
-	async function fetchUrls() {
-		if (!auth.token) return;
-		loading = true;
-		error = null;
-		consumedIds.clear();
-		try {
-			const res = await listUrls(auth.token, page, perPage);
-			urls = res.urls;
-			total = res.total;
-			checkUrls();
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load saved URLs';
-		} finally {
-			loading = false;
-		}
-	}
+	const totalPages = $derived(Math.max(1, Math.ceil(localUrls.urls.length / PER_PAGE)));
 
 	async function checkUrls() {
-		const checks = urls
+		if (checking || localUrls.urls.length === 0) return;
+		checking = true;
+		consumedIds.clear();
+
+		const checks = localUrls.urls
 			.map((item) => {
 				const fileId = extractFileId(item.url);
 				return fileId ? { id: item.id, fileId } : null;
@@ -51,56 +37,42 @@
 		);
 
 		for (const { id, exists } of results) {
-			if (!exists) {
-				consumedIds.add(id);
-			}
+			if (!exists) consumedIds.add(id);
 		}
+
+		checking = false;
 	}
 
 	function prevPage() {
-		if (page > 1) {
-			page--;
-			fetchUrls();
-		}
+		if (page > 1) page--;
 	}
 
 	function nextPage() {
-		if (page < totalPages) {
-			page++;
-			fetchUrls();
-		}
+		if (page < totalPages) page++;
 	}
+
+	// Reset to page 1 if data shrinks below the current window
+	$effect(() => {
+		if (localUrls.urls.length > 0 && page > totalPages) {
+			page = totalPages;
+		}
+	});
 
 	async function copyUrl(url: string, id: string) {
 		try {
 			await navigator.clipboard.writeText(url);
 			copiedId = id;
-			setTimeout(() => {
-				copiedId = null;
-			}, 2000);
+			setTimeout(() => (copiedId = null), 2000);
 		} catch {
 			// Clipboard API may not be available
 		}
 	}
 
-	async function handleDelete(id: string) {
-		if (!auth.token) return;
+	function handleDelete(id: string) {
 		if (!confirm('Are you sure you want to delete this saved URL?')) return;
-
-		deletingIds.add(id);
-		try {
-			await deleteUrl(id, auth.token);
-			urls = urls.filter((u) => u.id !== id);
-			total--;
-			if (urls.length === 0 && page > 1) {
-				page--;
-				fetchUrls();
-			}
-		} catch (e) {
-			alert(e instanceof Error ? e.message : 'Failed to delete URL');
-		} finally {
-			deletingIds.delete(id);
-		}
+		localUrls.remove(id);
+		consumedIds.delete(id);
+		// $effect above handles page correction
 	}
 
 	function formatDate(iso: string): string {
@@ -119,11 +91,7 @@
 	}
 
 	onMount(() => {
-		if (!auth.isAuthenticated) {
-			goto(resolve('/login'));
-			return;
-		}
-		fetchUrls();
+		checkUrls();
 	});
 </script>
 
@@ -142,47 +110,7 @@
 		</p>
 	</div>
 
-	<!-- Loading state -->
-	{#if loading && urls.length === 0}
-		<div
-			class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-12 text-center"
-		>
-			<div
-				class="mx-auto w-8 h-8 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin"
-			></div>
-			<p class="text-sm text-slate-400 mt-4">Loading your saved URLs…</p>
-		</div>
-	{:else if error}
-		<!-- Error state -->
-		<div
-			class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-red-100 p-8 text-center"
-		>
-			<div class="mx-auto w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6 text-red-500"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					stroke-width="1.5"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-					/>
-				</svg>
-			</div>
-			<p class="text-sm font-medium text-red-700 mb-1">Failed to load URLs</p>
-			<p class="text-xs text-red-500 mb-4">{error}</p>
-			<button
-				onclick={fetchUrls}
-				class="px-4 py-2 text-xs font-medium text-white bg-violet-500 hover:bg-violet-600 rounded-lg transition-colors cursor-pointer"
-			>
-				Try again
-			</button>
-		</div>
-	{:else if urls.length === 0}
+	{#if localUrls.urls.length === 0}
 		<!-- Empty state -->
 		<div
 			class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-12 text-center"
@@ -207,10 +135,10 @@
 			</div>
 			<p class="text-sm font-medium text-slate-600 mb-1">No saved URLs yet</p>
 			<p class="text-xs text-slate-400 mb-6">
-				When you upload a file while logged in, the link is saved automatically.
+				When you upload a file, the link is saved automatically to this browser.
 			</p>
 			<a
-				href={resolve('/')}
+				href="/"
 				class="inline-block px-4 py-2 text-xs font-medium text-white bg-violet-500 hover:bg-violet-600 rounded-lg transition-colors"
 			>
 				Upload a file
@@ -219,7 +147,7 @@
 	{:else}
 		<!-- URL list -->
 		<div class="space-y-3">
-			{#each urls as item (item.id)}
+			{#each paginatedUrls as item (item.id)}
 				<div
 					class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 hover:shadow-md hover:border-slate-200 transition-all duration-200"
 				>
@@ -284,39 +212,56 @@
 										</svg>
 									{/if}
 								</button>
+
+								<!-- Open link -->
+								<a
+									href={item.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+									title="Open link"
+								>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="w-4 h-4"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+										/>
+									</svg>
+								</a>
 							{/if}
 
 							<!-- Delete button (always visible) -->
 							<button
 								onclick={() => handleDelete(item.id)}
-								disabled={deletingIds.has(item.id)}
-								class="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
+								class="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
 								title="Delete saved URL"
 								aria-label="Delete saved URL"
 							>
-								{#if deletingIds.has(item.id)}
-									<div
-										class="w-4 h-4 border-2 border-red-200 border-t-red-500 rounded-full animate-spin"
-									></div>
-								{:else}
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										class="w-4 h-4"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
-										<polyline points="3 6 5 6 21 6" />
-										<path
-											d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-										/>
-										<line x1="10" y1="11" x2="10" y2="17" />
-										<line x1="14" y1="11" x2="14" y2="17" />
-									</svg>
-								{/if}
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									class="w-4 h-4"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<polyline points="3 6 5 6 21 6" />
+									<path
+										d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+									/>
+									<line x1="10" y1="11" x2="10" y2="17" />
+									<line x1="14" y1="11" x2="14" y2="17" />
+								</svg>
 							</button>
 						</div>
 					</div>
@@ -352,15 +297,6 @@
 				>
 					Next →
 				</button>
-			</div>
-		{/if}
-
-		<!-- Loading overlay for pagination -->
-		{#if loading}
-			<div class="flex justify-center mt-4">
-				<div
-					class="w-5 h-5 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin"
-				></div>
 			</div>
 		{/if}
 	{/if}

@@ -87,15 +87,13 @@
 					Zero Knowledge
 				</a>
 
-				<!-- Saved URLs (authenticated users only) -->
-				{#if auth.isAuthenticated}
-					<a
-						href={resolve('/urls')}
-						class="px-3 py-1.5 text-xs font-medium text-violet-600 hover:text-violet-800 hover:bg-violet-50 rounded-lg transition-colors"
-					>
-						Saved URLs
-					</a>
-				{/if}
+				<!-- Saved URLs (always visible — stored locally in this browser) -->
+				<a
+					href={resolve('/urls')}
+					class="px-3 py-1.5 text-xs font-medium text-violet-600 hover:text-violet-800 hover:bg-violet-50 rounded-lg transition-colors"
+				>
+					Saved URLs
+				</a>
 
 				<!-- Auth section -->
 				{#if auth.isAuthenticated && auth.user}

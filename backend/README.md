@@ -4,7 +4,7 @@ Backend API for the file-sharing service. Built with **Rust** and **Axum**, it g
 
 The backend never sees plaintext — all encryption and decryption happens client-side in the browser. It stores and serves opaque ciphertext only.
 
-The backend also supports optional user accounts with bcrypt password hashing, JWT authentication, and MongoDB storage. Authenticated users can save capability URLs to their collection and browse them later.
+The backend also supports optional user accounts with bcrypt password hashing, JWT authentication, and MongoDB storage. Authenticated users can save capability URLs to their collection, though the default frontend stores these in the browser's localStorage instead.
 
 ## Quick Start
 
@@ -84,7 +84,7 @@ Auth endpoints pass the JWT in the request body (for login/register) or as a `{t
 | POST | `/v1/urls` | Save a capability URL. Accepts `{url, title}`, returns `{id, url, title, created_at}`. | `Authorization: Bearer <token>` |
 | GET | `/v1/urls` | List saved URLs with pagination. Query params: `page` (default 1), `per_page` (default 10, max 100). Returns `{urls, page, per_page, total}`. | `Authorization: Bearer <token>` |
 
-These endpoints are protected by the `require_auth` middleware, which validates the JWT before the request reaches the handler. Unauthenticated requests receive `401 Unauthorized`. The middleware extracts the token from the `Authorization: Bearer <token>` header, validates it using `JWT_SECRET`, and inserts an `AuthUser` extension so handlers can access the verified claims without re-validating.
+These endpoints are protected by the `require_auth` middleware, which validates the JWT before the request reaches the handler. Unauthenticated requests receive `401 Unauthorized`. The default frontend stores saved URLs in localStorage and does not call these endpoints, but they are available for custom deployments that prefer server-side storage.
 
 ### Example: Health Check
 
