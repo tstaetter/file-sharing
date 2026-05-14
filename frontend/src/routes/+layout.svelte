@@ -221,7 +221,6 @@
 					</svg>
 					GitHub
 				</a>
-				<a href="/zero-knowledge" class="hover:text-slate-600 transition-colors">Zero Knowledge</a>
 				<a href="/tos" class="hover:text-slate-600 transition-colors">Terms of Service</a>
 				<a href="/privacy" class="hover:text-slate-600 transition-colors">Privacy Policy</a>
 				<a href="/cookies" class="hover:text-slate-600 transition-colors">Cookie Policy</a>
