@@ -193,7 +193,25 @@ pub async fn delete_url(
         return Err(SavedUrlError::NotFound);
     }
 
-    Ok(StatusCode::NO_CONTENT)
+    // Delete the real file from S3
+    let key = format!("uploads/{}", &id);
+    match state
+        .s3
+        .delete_object()
+        .bucket(&state.bucket)
+        .key(&key)
+        .send()
+        .await
+    {
+        Ok(_) => {
+            tracing::info!(key = %key, "object deleted from R2");
+            Ok(StatusCode::NO_CONTENT)
+        }
+        Err(err) => {
+            tracing::warn!(key = %key, error = %err, "failed to delete object from R2");
+            Err(SavedUrlError::NotFound)
+        }
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -428,10 +446,12 @@ mod tests {
 
     #[test]
     fn test_save_url_response_from_saved_url() {
-        use chrono::TimeZone;
         use crate::db::saved_url::SavedUrlId;
+        use chrono::TimeZone;
         let saved = SavedUrl {
-            id: SavedUrlId::Uuid(mongodb::bson::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap()),
+            id: SavedUrlId::Uuid(
+                mongodb::bson::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            ),
             user_email: "user@test.com".to_string(),
             url: "https://filez.zone/f/abc#key".to_string(),
             title: Some("My file".to_string()),
@@ -447,8 +467,8 @@ mod tests {
 
     #[test]
     fn test_save_url_response_from_saved_url_objectid() {
-        use chrono::TimeZone;
         use crate::db::saved_url::SavedUrlId;
+        use chrono::TimeZone;
         use mongodb::bson::oid::ObjectId;
         let oid = ObjectId::parse_str("507f1f77bcf86cd799439011").unwrap();
         let saved = SavedUrl {
