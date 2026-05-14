@@ -186,8 +186,10 @@ We use [OpenPanel](https://openpanel.dev), a self-hosted, **cookieless** analyti
 ## Testing
 
 ```bash
-# Backend (cargo-nextest) — 106 tests pass
+# Backend (cargo-nextest) — 174 tests pass
 cd backend && cargo nextest run
+# Integration tests use per-test unique MongoDB databases
+# for parallel-safe execution when MongoDB is available.
 
 # Frontend (Vitest)
 cd frontend && deno task test

@@ -55,6 +55,16 @@ backend/
     └── middleware/
         ├── mod.rs         ← middleware module declarations
         └── auth.rs        ← require_auth middleware, AuthUser extractor, AuthMiddlewareError
+    └── tests/
+        ├── health_test.rs
+        ├── handlers_test.rs
+        ├── create_upload_integration_test.rs
+        ├── sign_parts_integration_test.rs
+        ├── complete_upload_integration_test.rs
+        ├── abort_upload_integration_test.rs
+        ├── download_integration_test.rs
+        ├── auth_integration_test.rs
+        └── saved_urls_integration_test.rs
 ```
 
 The project root (`file-sharing/`) also contains `docker-compose.yml`, a `.gitignore`, and a `frontend/` directory (outside the scope of this AGENTS.md).
@@ -115,6 +125,8 @@ We use **`cargo nextest`** for running tests. Install it with `cargo install car
 - Integration tests go in a `tests/` directory at the crate root (`backend/tests/`).
 - For handler tests that require an S3 client, prefer mocking or a test-only S3-compatible service (e.g. MinIO, or `aws-smithy-http` test utilities) rather than hitting a real R2 bucket. Document any test fixtures clearly.
 - For HTTP endpoint tests, use `axum::test` helpers (`axum::body::Body`, `axum::http::Request`, `axum::routing::into_make_service`) to spin up a test router without a real network socket.
+- **MongoDB integration tests** use a **per-test unique database** pattern: each test that needs a database calls `test_state_with_db("unique_db_name")` which creates a fresh MongoDB database, drops `users` and `saved_urls` collections for a clean slate, and returns an `AppState` wired to that database. This enables **parallel-safe execution** — tests never interfere with each other's data. The `test_state()` helper (no arguments) returns an `AppState` with `database: None` for testing behaviour when MongoDB is absent.
+- The `.config/nextest.toml` configuration file controls nextest settings such as retries, threads, and failure output. Keep it in sync with the CI environment.
 
 ## API Endpoints
 
@@ -326,3 +338,6 @@ Use Axum's `IntoResponse` to return `(StatusCode, String)` tuples or custom erro
 - For HTTP endpoint tests, use `axum::test::Server` or the lower-level `axum::body::Body` + `axum::http::Request` helpers to exercise handlers without binding to a real port.
 - For S3-dependent tests, use `aws-smithy-mocks` crate to avoid hitting the real R2 bucket.
 - For middleware tests, test token parsing logic as unit tests. For integration, build a test router with the middleware layer and assert on HTTP status codes.
+- For **MongoDB-dependent integration tests**, use the `test_state_with_db(db_name)` helper to create a per-test unique database. This pattern drops `users` and `saved_urls` collections at the start so each test gets a clean slate, enabling parallel-safe execution without data conflicts.
+- Use `test_state()` (no arguments) for tests that verify behaviour when MongoDB is absent — it returns an `AppState` with `database: None`.
+- See `.config/nextest.toml` for nextest configuration (retries, threads, failure output).
