@@ -136,3 +136,25 @@ export function extractFileId(url: string): string | null {
 		return null;
 	}
 }
+
+/**
+ * DELETE /v1/urls/{id}
+ *
+ * Deletes a saved URL by its ID. Only the owner can delete it.
+ *
+ * @param id     The ID of the saved URL record to delete.
+ * @param token  A valid JWT token for authentication.
+ */
+export async function deleteUrl(id: string, token: string): Promise<void> {
+	const res = await fetch(`${PUBLIC_API_PREFIX}/urls/${id}`, {
+		method: 'DELETE',
+		headers: {
+			Authorization: `Bearer ${token}`
+		}
+	});
+
+	if (!res.ok) {
+		const body = await res.text().catch(() => 'Unknown error');
+		throw new Error(body || `Failed to delete URL (${res.status})`);
+	}
+}

@@ -171,7 +171,13 @@ pub async fn delete_url(
         .as_ref()
         .ok_or_else(|| SavedUrlError::Database("no database configured".into()))?;
     let collection = db.collection::<SavedUrl>("saved_urls");
-    let object_id = mongodb::bson::Uuid::parse_str(&id).map_err(|_| SavedUrlError::NotFound)?;
+    let object_id = mongodb::bson::Uuid::parse_str(&id)
+        .map(crate::db::saved_url::SavedUrlId::Uuid)
+        .or_else(|_| {
+            mongodb::bson::oid::ObjectId::parse_str(&id)
+                .map(crate::db::saved_url::SavedUrlId::ObjectId)
+        })
+        .map_err(|_| SavedUrlError::NotFound)?;
     // Delete only if the URL belongs to the authenticated user
     let filter = doc! {
         "_id": &object_id,
@@ -423,8 +429,9 @@ mod tests {
     #[test]
     fn test_save_url_response_from_saved_url() {
         use chrono::TimeZone;
+        use crate::db::saved_url::SavedUrlId;
         let saved = SavedUrl {
-            id: mongodb::bson::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            id: SavedUrlId::Uuid(mongodb::bson::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap()),
             user_email: "user@test.com".to_string(),
             url: "https://filez.zone/f/abc#key".to_string(),
             title: Some("My file".to_string()),
@@ -439,9 +446,30 @@ mod tests {
     }
 
     #[test]
+    fn test_save_url_response_from_saved_url_objectid() {
+        use chrono::TimeZone;
+        use crate::db::saved_url::SavedUrlId;
+        use mongodb::bson::oid::ObjectId;
+        let oid = ObjectId::parse_str("507f1f77bcf86cd799439011").unwrap();
+        let saved = SavedUrl {
+            id: SavedUrlId::ObjectId(oid),
+            user_email: "user@test.com".to_string(),
+            url: "https://filez.zone/f/abc#key".to_string(),
+            title: Some("My file".to_string()),
+            created_at: Utc.with_ymd_and_hms(2025, 7, 16, 12, 0, 0).unwrap(),
+        };
+
+        let response = SaveUrlResponse::from(&saved);
+        assert_eq!(response.id, "507f1f77bcf86cd799439011");
+        assert_eq!(response.url, "https://filez.zone/f/abc#key");
+        assert_eq!(response.title, Some("My file".to_string()));
+        assert!(response.created_at.starts_with("2025-07-16T12:00:00"));
+    }
+
+    #[test]
     fn test_save_url_response_excludes_user_email() {
         let saved = SavedUrl {
-            id: mongodb::bson::Uuid::new(),
+            id: crate::db::saved_url::SavedUrlId::Uuid(mongodb::bson::Uuid::new()),
             user_email: "secret@test.com".to_string(),
             url: "url".to_string(),
             title: None,
