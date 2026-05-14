@@ -2,6 +2,7 @@
 	import '../app.css';
 	import { auth } from '$lib/auth.svelte';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	let { children } = $props();
 
@@ -21,7 +22,7 @@
 	async function handleLogout() {
 		auth.signOut();
 		showMenu = false;
-		goto('/');
+		goto(resolve('/'));
 	}
 
 	async function handleDeleteAccount() {
@@ -32,7 +33,7 @@
 		const ok = await auth.deleteAccount();
 		if (ok) {
 			showMenu = false;
-			goto('/');
+			goto(resolve('/'));
 		}
 	}
 </script>
@@ -71,7 +72,7 @@
 	<!-- Header navigation -->
 	<header class="border-b border-slate-200/60 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
 		<div class="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
-			<a href="/" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+			<a href={resolve('/')} class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
 				<div class="w-7 h-7 rounded-lg overflow-hidden shadow-sm shadow-violet-200/50">
 					<img src="/logo.webp" alt="filez.zone" class="w-full h-full object-cover" />
 				</div>
@@ -80,7 +81,7 @@
 
 			<nav class="flex items-center gap-1">
 				<a
-					href="/zero-knowledge"
+					href={resolve('/zero-knowledge')}
 					class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
 				>
 					Zero Knowledge
@@ -89,7 +90,7 @@
 				<!-- Saved URLs (authenticated users only) -->
 				{#if auth.isAuthenticated}
 					<a
-						href="/urls"
+						href={resolve('/urls')}
 						class="px-3 py-1.5 text-xs font-medium text-violet-600 hover:text-violet-800 hover:bg-violet-50 rounded-lg transition-colors"
 					>
 						Saved URLs
@@ -128,7 +129,6 @@
 
 						<!-- Dropdown -->
 						{#if showMenu}
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
 								class="fixed inset-0 z-20"
 								onclick={closeMenu}
@@ -145,7 +145,7 @@
 									<p class="text-[10px] text-slate-400">{auth.user.email}</p>
 								</div>
 								<a
-									href="/urls"
+									href={resolve('/urls')}
 									onclick={closeMenu}
 									class="block w-full text-left px-3 py-2 text-xs text-violet-600 hover:bg-violet-50 transition-colors cursor-pointer"
 								>
@@ -169,13 +169,13 @@
 				{:else}
 					<div class="flex items-center gap-1 ml-2">
 						<a
-							href="/login"
+							href={resolve('/login')}
 							class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
 						>
 							Log in
 						</a>
 						<a
-							href="/register"
+							href={resolve('/register')}
 							class="px-3 py-1.5 text-xs font-medium text-white bg-violet-500 hover:bg-violet-600 rounded-lg transition-colors shadow-sm"
 						>
 							Sign up
@@ -215,9 +215,14 @@
 					</svg>
 					GitHub
 				</a>
-				<a href="/tos" class="hover:text-slate-600 transition-colors">Terms of Service</a>
-				<a href="/privacy" class="hover:text-slate-600 transition-colors">Privacy Policy</a>
-				<a href="/cookies" class="hover:text-slate-600 transition-colors">Cookie Policy</a>
+				<a href={resolve('/tos')} class="hover:text-slate-600 transition-colors">Terms of Service</a
+				>
+				<a href={resolve('/privacy')} class="hover:text-slate-600 transition-colors"
+					>Privacy Policy</a
+				>
+				<a href={resolve('/cookies')} class="hover:text-slate-600 transition-colors"
+					>Cookie Policy</a
+				>
 			</nav>
 		</div>
 	</footer>
