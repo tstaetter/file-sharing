@@ -91,12 +91,6 @@
 				>
 					Zero Knowledge
 				</a>
-				<a
-					href="/privacy"
-					class="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors hidden sm:inline-block"
-				>
-					Privacy
-				</a>
 
 				<!-- Saved URLs (authenticated users only) -->
 				{#if auth.isAuthenticated}
