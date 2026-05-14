@@ -41,9 +41,10 @@ fn test_state() -> AppState {
 ///
 /// The function connects to the URI given by the `MONGODB_URI` environment
 /// variable (defaulting to `mongodb://localhost:27017`) and uses the
-/// database `filez_zone_auth_test`. The `users` collection is dropped at
-/// the start so every test starts with a clean slate.
-async fn test_state_with_db() -> AppState {
+/// database name provided by the caller. Both `users` and `saved_urls`
+/// collections are dropped at the start so every test starts with a
+/// clean slate.
+async fn test_state_with_db(db_name: &str) -> AppState {
     let credentials = aws_sdk_s3::config::Credentials::new(
         "test-access-key",
         "test-secret-key",
@@ -65,11 +66,15 @@ async fn test_state_with_db() -> AppState {
     let mongo_client = mongodb::Client::with_uri_str(&mongo_uri)
         .await
         .expect("Failed to connect to MongoDB for test — is it running?");
-    let db = mongo_client.database("filez_zone_auth_test");
+    let db = mongo_client.database(db_name);
 
-    // Clean slate: drop the users collection so each test is isolated.
+    // Clean slate: drop users and saved_urls collections so each test is isolated.
     let _ = db
         .collection::<mongodb::bson::Document>("users")
+        .drop()
+        .await;
+    let _ = db
+        .collection::<mongodb::bson::Document>("saved_urls")
         .drop()
         .await;
 
@@ -140,7 +145,7 @@ async fn register_and_get_token(
 #[tokio::test]
 async fn register_returns_200_and_token() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_reg_ok").await);
 
     let response = router
         .oneshot(
@@ -176,7 +181,7 @@ async fn register_returns_200_and_token() {
 #[tokio::test]
 async fn register_rejects_duplicate_email() {
     ensure_jwt_secret();
-    let state = test_state_with_db().await;
+    let state = test_state_with_db("auth_reg_dup").await;
     let router = app(state);
 
     // `oneshot` consumes the router, but `Router` implements `Clone`.
@@ -215,7 +220,7 @@ async fn register_rejects_duplicate_email() {
 #[tokio::test]
 async fn register_rejects_empty_email() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_reg_noem").await);
 
     let response = router
         .oneshot(
@@ -237,7 +242,7 @@ async fn register_rejects_empty_email() {
 #[tokio::test]
 async fn register_rejects_empty_password() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_reg_nopw").await);
 
     let response = router
         .oneshot(
@@ -259,7 +264,7 @@ async fn register_rejects_empty_password() {
 #[tokio::test]
 async fn register_rejects_empty_name() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_reg_noname").await);
 
     let response = router
         .oneshot(
@@ -281,7 +286,7 @@ async fn register_rejects_empty_name() {
 #[tokio::test]
 async fn register_rejects_missing_fields() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_reg_missing").await);
 
     // Missing `email` field entirely → Serde deserialization error → 422
     let response = router
@@ -302,7 +307,7 @@ async fn register_rejects_missing_fields() {
 #[tokio::test]
 async fn register_returns_json_content_type() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_reg_ct").await);
 
     let response = router
         .oneshot(
@@ -335,7 +340,7 @@ async fn register_returns_json_content_type() {
 #[tokio::test]
 async fn login_returns_token_for_valid_credentials() {
     ensure_jwt_secret();
-    let state = test_state_with_db().await;
+    let state = test_state_with_db("auth_login_ok").await;
     let router = app(state);
 
     // Register first via the helper
@@ -378,7 +383,7 @@ async fn login_returns_token_for_valid_credentials() {
 #[tokio::test]
 async fn login_rejects_wrong_password() {
     ensure_jwt_secret();
-    let state = test_state_with_db().await;
+    let state = test_state_with_db("auth_login_wrongpw").await;
     let router = app(state);
 
     let _token = register_and_get_token(
@@ -409,7 +414,7 @@ async fn login_rejects_wrong_password() {
 #[tokio::test]
 async fn login_rejects_nonexistent_user() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_login_nouser").await);
 
     let response = router
         .oneshot(
@@ -431,7 +436,7 @@ async fn login_rejects_nonexistent_user() {
 #[tokio::test]
 async fn login_rejects_empty_email() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_login_noem").await);
 
     let response = router
         .oneshot(
@@ -451,7 +456,7 @@ async fn login_rejects_empty_email() {
 #[tokio::test]
 async fn login_rejects_empty_password() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_login_nopw").await);
 
     let response = router
         .oneshot(
@@ -473,7 +478,7 @@ async fn login_rejects_empty_password() {
 #[tokio::test]
 async fn generated_token_is_valid_jwt() {
     ensure_jwt_secret();
-    let state = test_state_with_db().await;
+    let state = test_state_with_db("auth_token_jwt").await;
     let router = app(state);
 
     let token =
@@ -515,7 +520,7 @@ async fn generated_token_is_valid_jwt() {
 #[tokio::test]
 async fn token_can_be_used_for_authentication() {
     ensure_jwt_secret();
-    let state = test_state_with_db().await;
+    let state = test_state_with_db("auth_token_use").await;
     let router = app(state);
 
     let token = register_and_get_token(
@@ -548,7 +553,7 @@ async fn token_can_be_used_for_authentication() {
 #[tokio::test]
 async fn delete_returns_204_with_valid_token() {
     ensure_jwt_secret();
-    let state = test_state_with_db().await;
+    let state = test_state_with_db("auth_delete_204").await;
     let router = app(state);
 
     let token = register_and_get_token(
@@ -583,7 +588,7 @@ async fn delete_returns_204_with_valid_token() {
 #[tokio::test]
 async fn delete_rejects_missing_auth_header() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_delete_noauth").await);
 
     let response = router
         .oneshot(
@@ -603,7 +608,7 @@ async fn delete_rejects_missing_auth_header() {
 #[tokio::test]
 async fn delete_rejects_invalid_token() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_delete_badtok").await);
 
     let response = router
         .oneshot(
@@ -626,7 +631,7 @@ async fn delete_rejects_invalid_token() {
 #[tokio::test]
 async fn delete_rejects_malformed_auth_header() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_delete_malformed").await);
 
     let response = router
         .oneshot(
@@ -648,7 +653,7 @@ async fn delete_rejects_malformed_auth_header() {
 #[tokio::test]
 async fn deleted_user_cannot_login() {
     ensure_jwt_secret();
-    let state = test_state_with_db().await;
+    let state = test_state_with_db("auth_deleted_login").await;
     let router = app(state);
 
     let token =
@@ -768,7 +773,7 @@ async fn delete_returns_500_without_database() {
 #[tokio::test]
 async fn full_auth_lifecycle() {
     ensure_jwt_secret();
-    let state = test_state_with_db().await;
+    let state = test_state_with_db("auth_lifecycle").await;
     let router = app(state);
 
     // 1. Register a new user
@@ -818,7 +823,7 @@ async fn full_auth_lifecycle() {
 #[tokio::test]
 async fn register_rejects_get() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_reg_get").await);
 
     // GET to a POST-only route → 405 Method Not Allowed
     let response = router
@@ -838,7 +843,7 @@ async fn register_rejects_get() {
 #[tokio::test]
 async fn login_rejects_get() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_login_get").await);
 
     // GET to a POST-only route → 405 Method Not Allowed
     let response = router
@@ -858,7 +863,7 @@ async fn login_rejects_get() {
 #[tokio::test]
 async fn delete_rejects_post() {
     ensure_jwt_secret();
-    let router = app(test_state_with_db().await);
+    let router = app(test_state_with_db("auth_delete_post").await);
 
     // POST to a DELETE-only route on a protected route → 401 Unauthorized
     // Middleware runs before method routing, so the missing auth header
