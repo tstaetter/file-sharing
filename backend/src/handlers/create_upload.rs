@@ -1,19 +1,5 @@
-use crate::{handlers::errors::CreateUploadError, AppState};
+use crate::{handlers::errors::CreateUploadError, AppState, CreateRequest, CreateResponse};
 use axum::{extract::State, Json};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct CreateRequest {
-    pub file_id: String,
-    pub content_type: Option<String>,
-    pub chunk_size: Option<u64>,
-}
-
-#[derive(Serialize)]
-pub struct CreateResponse {
-    pub upload_id: String,
-    pub key: String,
-}
 
 pub async fn create_upload(
     State(state): State<AppState>,

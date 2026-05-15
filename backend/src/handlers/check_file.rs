@@ -1,12 +1,6 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
-use serde::Deserialize;
 
-use crate::{handlers::errors::CheckFileError, AppState};
-
-#[derive(Debug, Deserialize)]
-pub struct CheckFileRequest {
-    pub key: String,
-}
+use crate::{handlers::errors::CheckFileError, AppState, CheckFileRequest};
 
 pub async fn check_file(
     State(state): State<AppState>,

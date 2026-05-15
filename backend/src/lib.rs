@@ -1,11 +1,13 @@
 mod db;
 mod handlers;
 mod middleware;
+mod payloads;
 mod routes;
 
 pub use db::*;
 pub use handlers::*;
 pub use middleware::*;
+pub use payloads::*;
 pub use routes::app;
 
 use aws_sdk_s3::Client;

@@ -1,23 +1,9 @@
 use crate::handlers::errors::CompleteUploadError;
-use crate::AppState;
+use crate::{AppState, CompleteRequest};
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::Json;
-use serde::Deserialize;
-
-#[derive(Debug, Deserialize)]
-pub struct CompleteRequest {
-    pub key: String,
-    pub upload_id: String,
-    pub parts: Vec<PartETag>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PartETag {
-    pub part_number: i32,
-    pub etag: String,
-}
 
 pub async fn complete_upload(
     State(state): State<AppState>,
