@@ -11,7 +11,7 @@ Background worker that scans Cloudflare R2 for orphaned multipart uploads and ab
 5. Aborts are dispatched concurrently with a cap of 10 in-flight at a time.
 6. Exits after all eligible uploads have been processed.
 
-The 6-hour cutoff is hardcoded in `src/main.rs`. Orphaned uploads are not retried on failure — the next scheduled run will pick them up.
+The 6-hour cutoff is defined by `DEFAULT_ORPHAN_AGE_HOURS` in `src/lib.rs`. Orphaned uploads are not retried on failure — the next scheduled run will pick them up.
 
 ## Configuration
 
@@ -46,8 +46,23 @@ The worker runs once, processes orphaned uploads, logs progress, and exits. It i
 ### Testing
 
 ```bash
+# Run all tests (unit + integration)
+cargo test
+
+# Or with nextest for faster execution
 cargo nextest run
 ```
+
+**Unit tests** (in `src/lib.rs`) cover error formatting, cutoff calculation, and constant sanity checks.
+
+**Integration tests** (in `tests/integration_test.rs`) use `StaticReplayClient` from `aws-smithy-runtime` to mock the S3 API at the HTTP level. No real R2 bucket is needed. They cover:
+
+- Empty upload list
+- New uploads skipped (above cutoff)
+- Old uploads aborted (below cutoff)
+- Mixed old/new only aborts old
+- Pagination follows truncated markers
+- Concurrent aborts for multiple old uploads
 
 ## Docker
 
@@ -119,9 +134,11 @@ worker/cleanup-orphaned-uploads/
 ├── Dockerfile
 ├── .dockerignore
 ├── README.md
-└── src/
-    ├── main.rs   ← R2 client setup, pagination loop, abort orchestration
-    └── lib.rs    ← CleanupError / CleanupResult type definitions
+├── src/
+│   ├── main.rs   ← thin entry point (env vars, S3 client, calls lib)
+│   └── lib.rs    ← core cleanup logic, error types, constants, unit tests
+└── tests/
+    └── integration_test.rs  ← mock-S3 integration tests
 ```
 
 ## Tech Stack
@@ -135,6 +152,7 @@ worker/cleanup-orphaned-uploads/
 | Error handling | `thiserror` 2.x |
 | Logging | `tracing` + `tracing-subscriber` |
 | Env vars | `dotenvy` |
+| Testing | `aws-smithy-runtime` (`test-util` feature for S3 mocking) |
 | Cron scheduler | `supercronic` (in Docker) |
 | Deployment | `Koyeb` |
 
