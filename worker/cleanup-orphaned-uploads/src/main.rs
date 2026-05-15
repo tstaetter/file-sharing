@@ -1,15 +1,13 @@
 use aws_config::{BehaviorVersion, Region};
-use aws_sdk_s3::Client;
 use aws_sdk_s3::config::Credentials;
-use aws_smithy_types_convert::date_time::DateTimeExt;
-use chrono::{Duration, Utc};
-use cleanup_orphaned_uploads::{CleanupError, CleanupResult};
-use futures::{StreamExt, stream::FuturesUnordered};
+use aws_sdk_s3::Client;
+use chrono::Duration;
+use cleanup_orphaned_uploads::{cleanup_orphaned_uploads, CleanupResult, DEFAULT_ORPHAN_AGE_HOURS};
 use std::env;
 use tracing::info;
-use tracing_subscriber::{EnvFilter, prelude::*};
+use tracing_subscriber::{prelude::*, EnvFilter};
 
-const MAX_CONCURRENT: usize = 10;
+const MAX_CONCURRENT: usize = cleanup_orphaned_uploads::MAX_CONCURRENT;
 
 #[tokio::main]
 async fn main() -> CleanupResult<()> {
@@ -20,8 +18,6 @@ async fn main() -> CleanupResult<()> {
     dotenvy::dotenv().ok();
 
     // Default to info-level logging if RUST_LOG is not set.
-    // Without this, EnvFilter::from_default_env() produces no output at all
-    // when RUST_LOG is absent, making startup failures invisible on Koyeb.
     if env::var("RUST_LOG").is_err() {
         env::set_var("RUST_LOG", "info");
     }
@@ -69,85 +65,7 @@ async fn main() -> CleanupResult<()> {
 
     info!("S3 client initialized");
 
-    // cutoff: alles älter als X Stunden löschen
-    let cutoff = Utc::now() - Duration::hours(6);
+    let cutoff = chrono::Utc::now() - Duration::hours(DEFAULT_ORPHAN_AGE_HOURS);
 
-    info!("Cleaning uploads older than {}", cutoff);
-
-    let mut tasks = FuturesUnordered::new();
-    let mut key_marker = None;
-    let mut upload_id_marker = None;
-
-    loop {
-        let resp = client
-            .list_multipart_uploads()
-            .prefix("uploads/")
-            .bucket(&bucket)
-            .set_key_marker(key_marker.clone())
-            .set_upload_id_marker(upload_id_marker.clone())
-            .send()
-            .await
-            .map_err(|e| CleanupError::Sdk(e.to_string()))?;
-
-        for upload in resp.uploads() {
-            let key = upload.key().unwrap_or_default().to_string();
-            let upload_id = upload.upload_id().unwrap_or_default().to_string();
-
-            let initiated = upload.initiated().unwrap();
-            let initiated_time = initiated.to_chrono_utc()?;
-
-            if initiated_time < cutoff {
-                let client_clone = client.clone();
-                let bucket_clone = bucket.clone();
-
-                tasks.push(tokio::spawn(async move {
-                    info!("Aborting {} ({})", key, upload_id);
-
-                    client_clone
-                        .abort_multipart_upload()
-                        .bucket(bucket_clone)
-                        .key(&*key)
-                        .upload_id(&*upload_id)
-                        .send()
-                        .await
-                }));
-
-                // 🧠 Concurrency Limit
-                if tasks.len() >= MAX_CONCURRENT {
-                    if let Some(res) = tasks.next().await {
-                        match res {
-                            Ok(Ok(_)) => {}
-                            Ok(Err(e)) => return Err(CleanupError::Sdk(e.to_string())),
-                            Err(e) => return Err(CleanupError::Sdk(e.to_string())),
-                        }
-                    }
-                }
-            }
-        }
-
-        // pagination check
-        if let Some(truncated) = resp.is_truncated() {
-            if truncated {
-                key_marker = resp.next_key_marker().map(|s| s.to_string());
-                upload_id_marker = resp.next_upload_id_marker().map(|s| s.to_string());
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-
-    // remaining tasks abwarten
-    while let Some(res) = tasks.next().await {
-        match res {
-            Ok(Ok(_)) => {}
-            Ok(Err(e)) => return Err(CleanupError::Sdk(e.to_string())),
-            Err(e) => return Err(CleanupError::Sdk(e.to_string())),
-        }
-    }
-
-    info!("Cleanup finished");
-
-    Ok(())
+    cleanup_orphaned_uploads(&client, &bucket, "uploads/", cutoff, MAX_CONCURRENT).await
 }
