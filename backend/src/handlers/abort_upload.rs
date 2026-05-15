@@ -1,15 +1,8 @@
 use crate::handlers::errors::AbortUploadError;
-use crate::AppState;
+use crate::{AbortRequest, AppState};
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::Json;
-use serde::Deserialize;
-
-#[derive(Debug, Deserialize)]
-pub struct AbortRequest {
-    pub key: String,
-    pub upload_id: String,
-}
 
 pub async fn abort_upload(
     State(state): State<AppState>,

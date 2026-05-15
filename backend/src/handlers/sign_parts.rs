@@ -1,22 +1,9 @@
 use crate::{handlers::errors::SignPartsError, AppState};
+use crate::{SignPartsRequest, SignedPart};
 use aws_sdk_s3::presigning::PresigningConfig;
 use axum::extract::State;
 use axum::Json;
-use serde::{Deserialize, Serialize};
 use std::time::Duration;
-
-#[derive(Debug, Deserialize)]
-pub struct SignPartsRequest {
-    pub key: String,
-    pub upload_id: String,
-    pub part_numbers: Vec<i32>,
-}
-
-#[derive(Serialize)]
-pub struct SignedPart {
-    pub part_number: i32,
-    pub url: String,
-}
 
 pub async fn sign_parts(
     State(state): State<AppState>,

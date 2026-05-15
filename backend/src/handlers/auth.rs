@@ -1,7 +1,7 @@
-use crate::db::user::User;
 use crate::handlers::errors::AuthError;
-use crate::AppState;
 use crate::middleware::AuthUser;
+use crate::{db::user::User, RegisterRequest};
+use crate::{AppState, LoginRequest, LoginResponse, RegisterResponse};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -54,49 +54,6 @@ pub fn validate_token(token: &str) -> Result<Claims, AuthError> {
     .map_err(|e| AuthError::JwtValidation(e.to_string()))
 }
 
-// ── Request / Response types ──────────────────────────────────────────
-
-#[derive(Debug, Deserialize)]
-pub struct RegisterRequest {
-    pub email: String,
-    pub password: String,
-    pub name: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct RegisterResponse {
-    pub token: String,
-    pub user: UserResponse,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct LoginRequest {
-    pub email: String,
-    pub password: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct LoginResponse {
-    pub token: String,
-    pub user: UserResponse,
-}
-
-
-#[derive(Debug, Serialize)]
-pub struct UserResponse {
-    pub email: String,
-    pub name: String,
-}
-
-impl From<&User> for UserResponse {
-    fn from(user: &User) -> Self {
-        UserResponse {
-            email: user.email.clone(),
-            name: user.name.clone(),
-        }
-    }
-}
-
 // ── Handlers ──────────────────────────────────────────────────────────
 
 /// Register a new user.
@@ -144,7 +101,7 @@ pub async fn register(
 
     // Generate JWT
     let token = create_token(&req.email)?;
-    let user_response = UserResponse::from(&user);
+    let user_response = crate::UserResponse::from(&user);
 
     Ok(Json(RegisterResponse {
         token,
@@ -185,7 +142,7 @@ pub async fn login(
 
     // Generate JWT
     let token = create_token(&req.email)?;
-    let user_response = UserResponse::from(&user);
+    let user_response = crate::UserResponse::from(&user);
 
     Ok(Json(LoginResponse {
         token,
@@ -224,6 +181,8 @@ pub async fn delete_user(
 
 #[cfg(test)]
 mod tests {
+    use crate::UserResponse;
+
     use super::*;
     use axum::response::IntoResponse;
 
@@ -333,7 +292,6 @@ mod tests {
         let json = r#"{"email":"a@b.com"}"#;
         serde_json::from_str::<LoginRequest>(json).unwrap_err();
     }
-
 
     // ── Unit tests: Error types ───────────────────────────────────────
 
