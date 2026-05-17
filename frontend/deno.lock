@@ -1547,6 +1547,7 @@
         "npm:postcss@^8.5.14",
         "npm:prettier-plugin-svelte@^3.5.1",
         "npm:prettier@^3.8.1",
+        "npm:resend@^4.8.0",
         "npm:svelte-check@^4.4.6",
         "npm:svelte@^5.55.2",
         "npm:tailwindcss@^3.4.19",

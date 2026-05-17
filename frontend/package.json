@@ -20,6 +20,7 @@
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@types/node": "^24",
+		"@types/react": "^19.2.14",
 		"eslint": "^10.2.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.17.0",
@@ -35,6 +36,8 @@
 	"dependencies": {
 		"autoprefixer": "^10.5.0",
 		"postcss": "^8.5.14",
+		"react": "^19.2.6",
+		"resend": "^4.8.0",
 		"shazoneSDK": "file:./packages/shazoneSDK",
 		"tailwindcss": "^3.4.19"
 	}

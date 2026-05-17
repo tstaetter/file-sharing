@@ -13,6 +13,12 @@
 	let saved = $state(false);
 	let dragOver = $state(false);
 
+	// Email sending state
+	let emailTo = $state('');
+	let emailSending = $state(false);
+	let emailSent = $state(false);
+	let emailError = $state('');
+
 	function handleFile(e: Event) {
 		const f = (e.target as HTMLInputElement).files?.[0];
 		file = f;
@@ -43,6 +49,8 @@
 		uploading = true;
 		progress = 0;
 		saved = false;
+		emailSent = false;
+		emailError = '';
 		try {
 			const { raw, fileId } = await uploadFile(file, (p) => (progress = p));
 			link = await createCapabilityUrl(PUBLIC_PREFIX, fileId, raw);
@@ -52,6 +60,29 @@
 			saved = true;
 		} finally {
 			uploading = false;
+		}
+	}
+
+	async function sendEmail() {
+		if (!emailTo || !link) return;
+		emailSending = true;
+		emailError = '';
+		emailSent = false;
+		try {
+			const res = await fetch('/send', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ to: emailTo, link, fileName })
+			});
+			if (!res.ok) {
+				const err = await res.json();
+				throw new Error(err.error || 'Failed to send email');
+			}
+			emailSent = true;
+		} catch (e) {
+			emailError = e instanceof Error ? e.message : 'Failed to send email';
+		} finally {
+			emailSending = false;
 		}
 	}
 </script>
@@ -271,6 +302,51 @@
 						</div>
 					</div>
 				{/if}
+
+				<!-- Email sharing -->
+				<div class="mt-3 pt-3 border-t border-cyan-200/50">
+					<p class="text-[10px] font-medium text-cyan-700 uppercase tracking-wide mb-2">
+						Or send via email
+					</p>
+					<div class="flex items-center gap-2">
+						<input
+							type="email"
+							bind:value={emailTo}
+							placeholder="recipient@example.com"
+							disabled={emailSending}
+							class="flex-1 text-xs bg-white border border-cyan-200 rounded-lg px-3 py-2 text-slate-700 outline-none placeholder:text-slate-400 disabled:opacity-50"
+						/>
+						<button
+							onclick={sendEmail}
+							disabled={!emailTo || emailSending}
+							class="shrink-0 px-3 py-2 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white text-xs font-medium rounded-lg hover:from-cyan-600 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+						>
+							{#if emailSending}
+								Sending…
+							{:else}
+								Send
+							{/if}
+						</button>
+					</div>
+					{#if emailSent}
+						<p class="text-[10px] text-emerald-600 mt-1.5 flex items-center gap-1">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="w-3 h-3"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+							</svg>
+							Email sent!
+						</p>
+					{/if}
+					{#if emailError}
+						<p class="text-[10px] text-red-500 mt-1.5">{emailError}</p>
+					{/if}
+				</div>
 			</div>
 		{/if}
 	</div>
