@@ -297,7 +297,9 @@
 								<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
 							</svg>
 							<p class="text-[10px] text-violet-600">
-								Saved to <a href="/urls" class="underline hover:text-violet-800">your collection</a>
+								Saved to <a href={resolve('/urls')} class="underline hover:text-violet-800"
+									>your collection</a
+								>
 							</p>
 						</div>
 					</div>
