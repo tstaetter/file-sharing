@@ -1,11 +1,18 @@
 import { Resend } from 'resend';
-import { RESEND_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { PUBLIC_PREFIX } from '$env/static/public';
 import { createElement } from 'react';
 import { FileSharedTemplate } from '$lib/email/file-shared-template';
 import type { RequestHandler } from './$types';
 
-const resend = new Resend(RESEND_API_KEY);
+function getResend(): Resend | null {
+	const key = env.RESEND_API_KEY;
+	if (!key) {
+		console.error('RESEND_API_KEY is not set — email sending is disabled');
+		return null;
+	}
+	return new Resend(key);
+}
 
 interface SendBody {
 	to: string;
@@ -31,6 +38,11 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	const appName = 'filez.zone';
 	const appUrl = PUBLIC_PREFIX || 'https://filez.zone';
+
+	const resend = getResend();
+	if (!resend) {
+		return Response.json({ error: 'Email service is not configured' }, { status: 503 });
+	}
 
 	const { data, error } = await resend.emails.send({
 		from: `${appName} <no-reply@filez.zone>`,
