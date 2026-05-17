@@ -35,6 +35,7 @@
 	"dependencies": {
 		"autoprefixer": "^10.5.0",
 		"postcss": "^8.5.14",
+		"resend": "^4.8.0",
 		"shazoneSDK": "file:./packages/shazoneSDK",
 		"tailwindcss": "^3.4.19"
 	}
